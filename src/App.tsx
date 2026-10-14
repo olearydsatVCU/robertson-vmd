@@ -1,4 +1,6 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom'
+
+const Router = import.meta.env.VITE_SINGLE_FILE ? HashRouter : BrowserRouter
 import { ToastProvider } from './components/ui'
 import Home from './pages/Home'
 import MentorRegistration from './pages/MentorRegistration'
@@ -12,7 +14,7 @@ import NotFound from './pages/NotFound'
 export default function App() {
   return (
     <ToastProvider>
-      <BrowserRouter>
+      <Router>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/mentor-registration" element={<MentorRegistration />} />
@@ -27,7 +29,7 @@ export default function App() {
           <Route path="/admin-bookings" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </BrowserRouter>
+      </Router>
     </ToastProvider>
   )
 }

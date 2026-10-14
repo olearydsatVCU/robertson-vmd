@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useState, type ReactNode, type 
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, X } from 'lucide-react'
 import { EVENT } from '../lib/config'
+import headerImg from '../assets/mentorship-header.jpg'
 
 export function cn(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(' ')
@@ -88,7 +89,7 @@ export function CardContent({ children, className }: { children: ReactNode; clas
 export function HeaderBanner() {
   return (
     <div className="w-full mb-8">
-      <img src="/mentorship-header.jpg" alt={`${EVENT.term} Virtual Mentorship Day`} className="w-full h-auto object-cover" />
+      <img src={headerImg} alt={`${EVENT.term} Virtual Mentorship Day`} className="w-full h-auto object-cover" />
     </div>
   )
 }
