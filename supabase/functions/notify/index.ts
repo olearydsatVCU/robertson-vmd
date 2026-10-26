@@ -1,7 +1,7 @@
 // Supabase Edge Function: all Virtual Mentorship Day emails.
 // Called by the database (triggers + a 10-minute reminder job), never by the browser.
-// Body: { type: 'mentor_signup' | 'booking' | 'cancel', id } or { type: 'reminders' }
-// Secrets: GMAIL_USER, GMAIL_APP_PASSWORD, SITE_URL (optional)
+// Body: { type: 'mentor_signup' | 'booking' | 'cancel' | 'access_link', id } or { type: 'reminders' }
+// Secrets: GMAIL_USER, GMAIL_APP_PASSWORD, SITE_URL (optional), NOTIFY_SECRET (optional, see below)
 // Deploy with verify_jwt = false. It only ever emails addresses already in the database,
 // and each email is sent at most once (the *_sent_at columns).
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -17,6 +17,8 @@ const SITE = (Deno.env.get('SITE_URL') ?? 'https://olearydsatvcu.github.io/rober
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const GMAIL_USER = Deno.env.get('GMAIL_USER') ?? ''
+// If NOTIFY_SECRET is set, callers must send it in the x-vmd-secret header. The database does.
+const NOTIFY_SECRET = Deno.env.get('NOTIFY_SECRET') ?? ''
 const mailer = nodemailer.createTransport({
   host: 'smtp.gmail.com', port: 465, secure: true,
   auth: { user: GMAIL_USER, pass: (Deno.env.get('GMAIL_APP_PASSWORD') ?? '').replace(/\s/g, '') },
@@ -133,7 +135,7 @@ async function mentorSignup(id: string) {
       <p>You're registered as a mentor for VCU Robertson's Virtual Mentorship Day on <b>${EVENT_LABEL}</b>.</p>
       <p><b>Your open times (ET):</b> ${esc(slots)}</p>
       <p>Each time a student books you, you'll get an email with their details, the meeting link, and a calendar invite.</p>
-      <p>${button(`${SITE}/mentor-dashboard?email=${encodeURIComponent(m.email)}`, 'Manage my schedule')}</p>`))
+      <p>${button(`${SITE}/?login=mentor`, 'Manage my schedule')}</p>`))
     return 'sent'
   } catch (e) { await release('mentors', 'welcome_sent_at', id); throw e }
 }
@@ -149,12 +151,12 @@ async function bookingConfirmed(id: string) {
       <p>Hi ${esc(b.student_name)}, your 1-on-1 session is confirmed. This also confirms your sign-up for Virtual Mentorship Day.</p>
       ${sessionDetails(b, m)}
       <p>${button(b.meeting_url ?? SITE, 'Join meeting')} &nbsp; ${cal}</p>
-      <p style="font-size:14px;color:#666">Can't make it? <a href="${SITE}/student-dashboard?email=${encodeURIComponent(b.student_email)}">Cancel from your schedule</a> so another student can take the slot.</p>`), ics)
+      <p style="font-size:14px;color:#666">Can't make it? <a href="${SITE}/?login=student">Cancel from your schedule</a> so another student can take the slot.</p>`), ics)
     await send(m.email, `New booking: ${b.student_name} at ${b.selected_time} ET`, layout('A student booked a session with you', `
       <p>Hi ${esc(m.name)}, ${esc(b.student_name)} booked time with you.</p>
       ${sessionDetails(b, m)}
       <p>${button(b.meeting_url ?? SITE, 'Join meeting')} &nbsp; ${cal}</p>
-      <p style="font-size:14px;color:#666"><a href="${SITE}/mentor-dashboard?email=${encodeURIComponent(m.email)}">View or manage your schedule</a></p>`), ics)
+      <p style="font-size:14px;color:#666"><a href="${SITE}/?login=mentor">View or manage your schedule</a></p>`), ics)
     return 'sent'
   } catch (e) { await release('bookings', 'confirmation_sent_at', id); throw e }
 }
@@ -171,9 +173,24 @@ async function bookingCancelled(id: string) {
       <p>${button(`${SITE}/student-booking`, 'Book another mentor')}</p>`), ics)
     await send(m.email, `Cancelled: ${b.student_name} at ${b.selected_time} ET`, layout('A session was cancelled', `
       <p>Hi ${esc(m.name)}, this session was cancelled by ${esc(who)}.</p>${sessionDetails(b, m)}
-      <p style="font-size:14px;color:#666"><a href="${SITE}/mentor-dashboard?email=${encodeURIComponent(m.email)}">View your schedule</a></p>`), ics)
+      <p style="font-size:14px;color:#666"><a href="${SITE}/?login=mentor">View your schedule</a></p>`), ics)
     return 'sent'
   } catch (e) { await release('bookings', 'cancellation_sent_at', id); throw e }
+}
+
+async function accessLink(id: string) {
+  const { data: t } = await db.from('access_tokens').select('*').eq('token', id).maybeSingle()
+  if (!t || t.sent_at) return 'skipped'
+  await db.from('access_tokens').update({ sent_at: new Date().toISOString() }).eq('token', id)
+  const path = t.role === 'admin' ? '/admin' : `/${t.role}-dashboard`
+  const link = `${SITE}${path}?token=${t.token}`
+  const what = t.role === 'mentor' ? 'view your bookings and manage your time slots' : t.role === 'student' ? 'view or cancel your sessions' : 'open the admin dashboard'
+  await send(t.email, 'Your Virtual Mentorship Day sign-in link', layout('Your sign-in link', `
+    <p>Click the button to ${what}. This link works for 12 hours and only for you, so please don't forward it.</p>
+    <p>${button(link, 'Sign in')}</p>
+    <p style="font-size:13px;color:#666">If the button doesn't work, copy this address into your browser:<br><a href="${esc(link)}">${esc(link)}</a></p>
+    <p style="font-size:13px;color:#666">Didn't request this? You can ignore this email.</p>`))
+  return 'sent'
 }
 
 async function reminders() {
@@ -201,11 +218,13 @@ async function reminders() {
 
 Deno.serve(async (req) => {
   try {
+    if (NOTIFY_SECRET && req.headers.get('x-vmd-secret') !== NOTIFY_SECRET) return Response.json({ ok: false, error: 'forbidden' }, { status: 403 })
     const { type, id } = await req.json()
     const result =
       type === 'mentor_signup' ? await mentorSignup(id)
       : type === 'booking' ? await bookingConfirmed(id)
       : type === 'cancel' ? await bookingCancelled(id)
+      : type === 'access_link' ? await accessLink(id)
       : type === 'reminders' ? await reminders()
       : 'unknown type'
     return Response.json({ ok: true, result })

@@ -1,44 +1,50 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Page, Card, CardHeader, CardTitle, CardContent, Button, InvalidLink, Table, Th, Td, useToast } from '../components/ui'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Page, Card, CardHeader, CardTitle, CardContent, Button, Table, Th, Td, useToast } from '../components/ui'
+import { SignInPage } from '../components/SignIn'
 import { EVENT, sortTimes } from '../lib/config'
-import { supabase } from '../lib/supabase'
-import type { Booking, Mentor } from '../lib/types'
+import { getStudentSchedule, studentCancel, takeTokenFromUrl, setToken, type PublicMentor } from '../lib/api'
+import type { Booking } from '../lib/types'
 
-/** Serves both /student-dashboard?email= and /student-schedule?email= */
+type Row = Booking & { mentor: PublicMentor }
+
+/** Serves /student-dashboard and /student-schedule. Needs a sign-in link (token) from email. */
 export default function StudentDashboard() {
-  const [sp] = useSearchParams()
   const nav = useNavigate()
-  const email = sp.get('email')?.toLowerCase()
   const { toast } = useToast()
-  const [rows, setRows] = useState<(Booking & { mentor?: Mentor })[] | undefined>()
+  const [token, setTok] = useState<string | null>(() => takeTokenFromUrl('student'))
+  const [email, setEmail] = useState('')
+  const [rows, setRows] = useState<Row[] | undefined>()
+  const [error, setError] = useState<string | undefined>()
 
-  const load = useCallback(() => {
-    if (!email) return
-    ;(async () => {
-      const { data: b } = await supabase.from('bookings').select('*').eq('student_email', email).is('cancelled_at', null)
-      const ids = [...new Set((b || []).map((x) => x.mentor_id))]
-      const { data: ms } = ids.length ? await supabase.from('mentors').select('*').in('id', ids) : { data: [] }
-      const byId = new Map((ms || []).map((m) => [m.id, m]))
-      const times = sortTimes((b || []).map((x) => x.selected_time))
-      setRows(times.map((t) => (b || []).find((x) => x.selected_time === t)!).map((x) => ({ ...x, mentor: byId.get(x.mentor_id) })))
-    })()
-  }, [email])
-  useEffect(load, [load])
-
-  const cancel = async (b: Booking & { mentor?: Mentor }) => {
-    if (!confirm(`Cancel your ${b.selected_time} session with ${b.mentor?.name ?? 'your mentor'}? You'll both get an email.`)) return
-    const { error } = await supabase.rpc('cancel_booking', { p_booking_id: b.id, p_cancelled_by: 'student', p_reopen_slot: true })
-    if (error) return toast({ title: 'Could not cancel', description: error.message, variant: 'destructive' })
-    toast({ title: 'Session cancelled', description: 'A cancellation email is on its way.' }); load()
+  const load = async () => {
+    if (!token) return
+    try {
+      const d = await getStudentSchedule(token)
+      setEmail(d.email)
+      const times = sortTimes(d.bookings.map((x) => x.selected_time))
+      setRows(times.map((t) => d.bookings.find((x) => x.selected_time === t)!))
+    } catch (err) {
+      setToken('student', null); setTok(null); setError((err as Error).message)
+    }
   }
+  useEffect(() => { load() }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!email) return <InvalidLink />
+  if (!token) return <SignInPage role="student" reason={error} />
   if (!rows) return <Page><p className="text-muted-foreground">Loading…</p></Page>
+
+  const cancel = async (b: Row) => {
+    if (!confirm(`Cancel your ${b.selected_time} session with ${b.mentor?.name ?? 'your mentor'}? You'll both get an email.`)) return
+    try { await studentCancel(token, b.id); toast({ title: 'Session cancelled', description: 'A cancellation email is on its way.' }); load() }
+    catch (err) { toast({ title: 'Could not cancel', description: (err as Error).message, variant: 'destructive' }) }
+  }
 
   return (
     <Page maxWidth="max-w-5xl">
-      <Button variant="ghost" onClick={() => nav('/')} className="mb-4">← Home</Button>
+      <div className="flex justify-between mb-4">
+        <Button variant="ghost" onClick={() => nav('/')}>← Home</Button>
+        <Button variant="ghost" onClick={() => { setToken('student', null); nav('/') }}>Sign out</Button>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Student Schedule</CardTitle>

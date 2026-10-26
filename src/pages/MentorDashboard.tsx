@@ -1,79 +1,74 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Page, Card, CardHeader, CardTitle, CardContent, Button, Badge, InvalidLink, Table, Th, Td, useToast } from '../components/ui'
+import { useNavigate } from 'react-router-dom'
+import { Page, Card, CardHeader, CardTitle, CardContent, Button, Badge, Input, Table, Th, Td, useToast } from '../components/ui'
+import { SignInPage } from '../components/SignIn'
 import { EVENT, TIME_SLOTS, sortTimes } from '../lib/config'
-import { supabase } from '../lib/supabase'
+import { getMentorSchedule, mentorUpdate, mentorCancel, takeTokenFromUrl, setToken } from '../lib/api'
 import type { Booking, Mentor } from '../lib/types'
 
-/** Serves both /mentor-dashboard?email= and /mentor-schedule?id= */
+/** Serves /mentor-dashboard and /mentor-schedule. Needs a sign-in link (token) from email. */
 export default function MentorDashboard() {
-  const [sp] = useSearchParams()
   const nav = useNavigate()
   const { toast } = useToast()
-  const email = sp.get('email')?.toLowerCase()
-  const id = sp.get('id')
-  const [mentor, setMentor] = useState<Mentor | null | undefined>(undefined)
+  const [token, setTok] = useState<string | null>(() => takeTokenFromUrl('mentor'))
+  const [mentor, setMentor] = useState<Mentor | null>(null)
   const [bookings, setBookings] = useState<Booking[]>([])
+  const [error, setError] = useState<string | undefined>()
   const [toAdd, setToAdd] = useState<string[]>([])
+  const [meeting, setMeeting] = useState('')
   const [busy, setBusy] = useState(false)
 
   const load = async () => {
-    const q = supabase.from('mentors').select('*')
-    const { data } = id ? await q.eq('id', id).maybeSingle() : await q.eq('email', email!).maybeSingle()
-    setMentor(data)
-    if (data) {
-      const { data: b } = await supabase.from('bookings').select('*').eq('mentor_id', data.id).is('cancelled_at', null)
-      setBookings(sortTimes((b || []).map((x) => x.selected_time)).map((t) => (b || []).find((x) => x.selected_time === t)!))
+    if (!token) return
+    try {
+      const d = await getMentorSchedule(token)
+      setMentor(d.mentor); setMeeting(d.mentor.meeting_url || '')
+      setBookings(sortTimes(d.bookings.map((x) => x.selected_time)).map((t) => d.bookings.find((x) => x.selected_time === t)!))
+    } catch (err) {
+      setToken('mentor', null); setTok(null); setError((err as Error).message)
     }
   }
-  useEffect(() => { if (email || id) load() }, [email, id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!email && !id) return <InvalidLink />
-  if (mentor === null) {
-    return (
-      <Page>
-        <Card className="p-8 text-center space-y-3">
-          <h2 className="text-xl font-semibold">No mentor found with that email</h2>
-          <p className="text-muted-foreground">Check that you entered the email you registered with.</p>
-          <Button onClick={() => nav('/')}>Go to Home</Button>
-        </Card>
-      </Page>
-    )
-  }
+  if (!token) return <SignInPage role="mentor" reason={error} />
   if (!mentor) return <Page><p className="text-muted-foreground">Loading…</p></Page>
 
   const booked = new Set(bookings.map((b) => b.selected_time))
   const available = sortTimes(mentor.available_times || [])
   const addable = TIME_SLOTS.filter((t) => !available.includes(t) && !booked.has(t))
 
-  const cancel = async (b: Booking) => {
+  const run = async (fn: () => Promise<void>, msg: string) => {
+    setBusy(true)
+    try { await fn(); toast({ title: msg }); setToAdd([]); await load() }
+    catch (err) { toast({ title: 'Something went wrong', description: (err as Error).message, variant: 'destructive' }) }
+    setBusy(false)
+  }
+  const saveTimes = (next: string[], msg: string) => run(() => mentorUpdate(token, { available_times: next }), msg)
+  const cancel = (b: Booking) => {
     if (!confirm(`Cancel your ${b.selected_time} session with ${b.student_name}? They'll get an email.`)) return
     const reopen = confirm('Reopen this time slot so another student can book it?')
-    const { error } = await supabase.rpc('cancel_booking', { p_booking_id: b.id, p_cancelled_by: 'mentor', p_reopen_slot: reopen })
-    if (error) return toast({ title: 'Could not cancel', description: error.message, variant: 'destructive' })
-    toast({ title: 'Session cancelled', description: 'The student has been emailed.' }); load()
-  }
-
-  const saveTimes = async (next: string[], msg: string) => {
-    setBusy(true)
-    const { error } = await supabase.from('mentors').update({ available_times: next }).eq('id', mentor.id)
-    setBusy(false)
-    if (error) return toast({ title: 'Failed to update time slots', description: error.message, variant: 'destructive' })
-    toast({ title: msg }); setToAdd([]); load()
+    run(() => mentorCancel(token, b.id, reopen), 'Session cancelled. The student has been emailed.')
   }
 
   return (
     <Page maxWidth="max-w-5xl">
-      <Button variant="ghost" onClick={() => nav('/')} className="mb-4">← Home</Button>
+      <div className="flex justify-between mb-4">
+        <Button variant="ghost" onClick={() => nav('/')}>← Home</Button>
+        <Button variant="ghost" onClick={() => { setToken('mentor', null); nav('/') }}>Sign out</Button>
+      </div>
       <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Mentor Dashboard</CardTitle>
             <p className="text-muted-foreground mt-1">{mentor.name} · {mentor.email}</p>
           </CardHeader>
-          <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
-            <p><span className="text-muted-foreground">Event:</span> {EVENT.dateLong}</p>
-            <p><span className="text-muted-foreground">Meeting Link:</span> {mentor.meeting_url ? <a className="text-secondary hover:underline" href={mentor.meeting_url}>{mentor.meeting_url}</a> : 'N/A'}</p>
+          <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
+            <p><span className="text-muted-foreground">Event:</span> {EVENT.dateLong} (Eastern Time)</p>
+            <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); run(() => mentorUpdate(token, { meeting_url: meeting }), 'Meeting link saved') }}>
+              <Input placeholder="Your Zoom / Google Meet link" value={meeting} onChange={(e) => setMeeting(e.target.value)} />
+              <Button type="submit" variant="outline" disabled={busy || meeting === (mentor.meeting_url || '')}>Save</Button>
+            </form>
+            <p className="sm:col-span-2 text-xs text-muted-foreground">Leave the meeting link blank and each booking gets its own free video link automatically. Links in confirmation emails already sent won't change.</p>
           </CardContent>
         </Card>
 
@@ -91,7 +86,7 @@ export default function MentorDashboard() {
                     <Td>{b.graduation_date || 'N/A'}</Td>
                     <Td>{[...(b.discussion_topics || []), b.specific_topics].filter(Boolean).join('; ') || 'N/A'}</Td>
                     <Td>{b.meeting_url ? <a className="text-secondary hover:underline font-medium" href={b.meeting_url} target="_blank" rel="noreferrer">Join</a> : 'N/A'}</Td>
-                    <Td><Button variant="outline" className="h-8 px-3" onClick={() => cancel(b)}>Cancel</Button></Td>
+                    <Td><Button variant="outline" className="h-8 px-3" disabled={busy} onClick={() => cancel(b)}>Cancel</Button></Td>
                   </tr>
                 ))}</tbody>
               </Table>

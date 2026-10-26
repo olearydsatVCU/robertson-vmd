@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Page, BackButton, Card, CardHeader, CardTitle, CardContent, Field, Input, Button, CheckboxGroup, ClosedNotice, useToast } from '../components/ui'
 import { EVENT, TRACKS, OPEN_TO, TOPICS, TIME_SLOTS } from '../lib/config'
-import { supabase } from '../lib/supabase'
+import { registerMentor } from '../lib/api'
 
 export default function MentorRegistration() {
   const nav = useNavigate()
@@ -27,19 +27,16 @@ export default function MentorRegistration() {
     e.preventDefault()
     if (f.availableTimes.length === 0) return toast({ title: 'Pick at least one time slot', variant: 'destructive' })
     setSaving(true)
-    const email = f.email.trim().toLowerCase()
-    const { data, error } = await supabase
-      .from('mentors')
-      .upsert({
-        name: f.name.trim(), email, occupation: f.occupation.trim() || null, organization: f.organization.trim() || null,
-        linkedin_url: f.linkedIn.trim() || null, meeting_url: f.meetingUrl.trim() || null, image_url: f.imageUrl.trim() || null,
-        tracks: f.tracks, open_to: f.openTo, topics: f.topics, available_times: f.availableTimes,
-      }, { onConflict: 'email' })
-      .select('id')
-      .single()
+    try {
+      const mentor = await registerMentor({
+        name: f.name, email: f.email, occupation: f.occupation, organization: f.organization, linkedin_url: f.linkedIn,
+        meeting_url: f.meetingUrl, image_url: f.imageUrl, tracks: f.tracks, open_to: f.openTo, topics: f.topics, available_times: f.availableTimes,
+      })
+      nav('/mentor-confirmation', { state: { mentor } })
+    } catch (err) {
+      toast({ title: 'Registration failed', description: (err as Error).message, variant: 'destructive' })
+    }
     setSaving(false)
-    if (error) return toast({ title: 'Registration failed', description: error.message, variant: 'destructive' })
-    nav(`/mentor-confirmation?id=${data.id}`)
   }
 
   return (

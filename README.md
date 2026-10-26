@@ -5,26 +5,18 @@ Rebuild of the Spring 2026 mentorship-day site (originally on Lovable). Vite + R
 ## Run locally
 ```bash
 npm install
-cp .env.example .env   # then fill in Supabase URL/anon key + admin password
+cp .env.example .env   # optional: override Supabase URL/key
 npm run dev
 ```
 
 ## Live setup (Fall 2026)
-- Hosting: Vercel (imports this repo; `vercel.json` handles page routes). No env vars needed except `VITE_ADMIN_PASSWORD`.
+- Hosting: Vercel (`vercel.json` handles page routes) and/or GitHub Pages (`.github/workflows/pages.yml`). No env vars needed.
 - Database: Supabase project `bskdqzkcneuuqerhltrv` (migrations in `supabase/migrations`).
-- Emails: `supabase/functions/notify` sends mentor sign-up, booking confirmation (with calendar invite), 1-hour reminder, and cancellation emails through Gmail. Database triggers call it automatically.
-  Secrets in Supabase → Edge Functions → Secrets: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, optional `SITE_URL`.
+- Security: the browser never touches tables. Everything goes through checked database functions (`0003_lockdown.sql`).
+  Mentors, students and admins sign in with a one-time link emailed to them (valid 12 hours). Admin emails live in the `admins` table and can be edited from the admin page.
+- Emails: `supabase/functions/notify` sends mentor sign-up, booking confirmation (with calendar invite), 1-hour reminder, cancellation, and sign-in-link emails through Gmail. Database triggers call it automatically.
+  Secrets in Supabase → Edge Functions → Secrets: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, optional `SITE_URL`, optional `NOTIFY_SECRET` (set it to the value of `select value from app_secrets where key='notify_secret'` to stop anyone else calling the function).
 - Changing the event date: update `EVENT` in `src/lib/config.ts` **and** `EVENT_DATE` / `EVENT_LABEL` in `supabase/functions/notify/index.ts`.
-
-## Supabase setup
-1. Create a project at supabase.com.
-2. Run `supabase/migrations/0001_init.sql` in the SQL editor.
-3. Copy the project URL and anon key into `.env`.
-4. (Optional, for emails) deploy the edge function:
-   ```bash
-   supabase functions deploy send-booking-email
-   supabase secrets set RESEND_API_KEY=... FROM_EMAIL="VMD <noreply@yourdomain>"
-   ```
 
 ## Opening / closing registration
 Edit `src/lib/config.ts`: `mentorRegistrationOpen`, `studentBookingOpen`, plus event dates, contacts, tracks, topics, and time slots.
@@ -33,9 +25,9 @@ Edit `src/lib/config.ts`: `mentorRegistrationOpen`, `studentBookingOpen`, plus e
 - `/` home
 - `/mentor-registration` → `/mentor-confirmation?id=`
 - `/student-booking` → `/student-confirmation?id=`
-- `/mentor-dashboard?email=` and `/mentor-schedule?id=` (manage slots, view bookings)
-- `/student-dashboard?email=` and `/student-schedule?email=`
-- `/admin` (password from `VITE_ADMIN_PASSWORD`): bookings, mentors, students, waitlist matching, CSV export
+- `/mentor-dashboard` (sign-in link required): manage slots, meeting link, view/cancel bookings
+- `/student-dashboard` (sign-in link required): view/cancel sessions
+- `/admin` (sign-in link required, admin emails only): bookings, mentors, students, waitlist matching, admins, CSV export
 
 ## Deploy
 `npm run build` → static `dist/`. Works on Netlify, Vercel, or Cloudflare Pages. Add a SPA rewrite (all routes → `/index.html`).

@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Copy, Trash2, Pencil, Download } from 'lucide-react'
+import { Trash2, Pencil, Download } from 'lucide-react'
 import { Page, Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Field, Modal, Table, Th, Td, Badge, CheckboxGroup, useToast } from '../components/ui'
+import { SignInPage } from '../components/SignIn'
 import { TRACKS, OPEN_TO, TOPICS, TIME_SLOTS, sortTimes } from '../lib/config'
-import { supabase } from '../lib/supabase'
+import { adminGetAll, adminCancelBooking, adminDeleteMentor, adminUpdateMentor, adminMatch, adminDeleteStudent, adminSetAdmins, takeTokenFromUrl, setToken } from '../lib/api'
 import type { Booking, Mentor, StudentRequest } from '../lib/types'
 
-const ADMIN_PW = (import.meta.env.VITE_ADMIN_PASSWORD as string) || ''
-const SESSION_KEY = 'vmd-admin'
-
-type Tab = 'bookings' | 'mentors' | 'students' | 'matching'
+type Tab = 'bookings' | 'mentors' | 'students' | 'matching' | 'admins'
 
 export default function Admin() {
   const nav = useNavigate()
   const { toast } = useToast()
-  const [authed, setAuthed] = useState(() => sessionStorage.getItem(SESSION_KEY) === '1')
-  const [pw, setPw] = useState('')
+  const [token, setTok] = useState<string | null>(() => takeTokenFromUrl('admin'))
+  const [authError, setAuthError] = useState<string | undefined>()
+  const [admins, setAdmins] = useState<string[]>([])
+  const [adminsText, setAdminsText] = useState('')
   const [tab, setTab] = useState<Tab>('bookings')
   const [bookings, setBookings] = useState<Booking[]>([])
   const [mentors, setMentors] = useState<Mentor[]>([])
@@ -25,66 +25,44 @@ export default function Admin() {
   const [match, setMatch] = useState<Record<string, { mentorId?: string; time?: string }>>({})
 
   const load = async () => {
-    const [b, m, r] = await Promise.all([
-      supabase.from('bookings').select('*').is('cancelled_at', null).order('created_at', { ascending: false }),
-      supabase.from('mentors').select('*').order('name'),
-      supabase.from('student_requests').select('*').order('created_at', { ascending: false }),
-    ])
-    setBookings(b.data || []); setMentors(m.data || []); setRequests(r.data || [])
+    if (!token) return
+    try {
+      const d = await adminGetAll(token)
+      setBookings(d.bookings); setMentors(d.mentors); setRequests(d.requests); setAdmins(d.admins || [])
+    } catch (err) {
+      setToken('admin', null); setTok(null); setAuthError((err as Error).message)
+    }
   }
-  useEffect(() => { if (!authed) return; load(); const i = setInterval(load, 5000); return () => clearInterval(i) }, [authed])
+  useEffect(() => { if (!token) return; load(); const i = setInterval(load, 10000); return () => clearInterval(i) }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!authed) {
-    return (
-      <Page>
-        <Card className="max-w-md mx-auto">
-          <CardHeader><CardTitle>Admin Login</CardTitle></CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (ADMIN_PW && pw === ADMIN_PW) { sessionStorage.setItem(SESSION_KEY, '1'); setAuthed(true) } else toast({ title: 'Incorrect password', variant: 'destructive' }) }}>
-              <Field label="Password"><Input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoFocus /></Field>
-              {!ADMIN_PW && <p className="text-xs text-destructive">VITE_ADMIN_PASSWORD is not set in .env.</p>}
-              <div className="flex gap-2"><Button type="submit">Login</Button><Button type="button" variant="ghost" onClick={() => nav('/')}>Cancel</Button></div>
-            </form>
-          </CardContent>
-        </Card>
-      </Page>
-    )
-  }
+  if (!token) return <SignInPage role="admin" reason={authError} />
+  const fail = (title: string) => (err: unknown) => toast({ title, description: (err as Error).message, variant: 'destructive' })
 
   const mentorById = new Map(mentors.map((m) => [m.id, m]))
-  const copy = (text: string, msg: string) => { navigator.clipboard.writeText(text); toast({ title: 'Link Copied!', description: msg }) }
   const q = search.toLowerCase()
 
   /* ---- actions ---- */
   const deleteBooking = async (b: Booking) => {
     if (!confirm(`Delete ${b.student_name}'s booking with ${mentorById.get(b.mentor_id)?.name} at ${b.selected_time}? The slot will reopen and both people get a cancellation email.`)) return
-    const { error } = await supabase.rpc('cancel_booking', { p_booking_id: b.id, p_cancelled_by: 'admin', p_reopen_slot: true })
-    if (error) return toast({ title: 'Error', description: 'Failed to cancel booking.', variant: 'destructive' })
+    try { await adminCancelBooking(token, b.id) } catch (err) { return fail('Failed to cancel booking')(err) }
     toast({ title: 'Booking Cancelled', description: 'Both people were emailed and the time slot is open again.' }); load()
   }
   const deleteMentor = async (m: Mentor) => {
-    if (!confirm(`Delete mentor ${m.name} and ALL of their bookings? This cannot be undone.`)) return
-    const { error: e1 } = await supabase.from('bookings').delete().eq('mentor_id', m.id)
-    if (e1) return toast({ title: 'Error', description: 'Failed to delete mentor bookings.', variant: 'destructive' })
-    const { error } = await supabase.from('mentors').delete().eq('id', m.id)
-    if (error) return toast({ title: 'Error', description: 'Failed to delete mentor.', variant: 'destructive' })
-    toast({ title: 'Mentor Deleted', description: 'The mentor and their bookings have been removed successfully.' }); load()
+    if (!confirm(`Remove mentor ${m.name}? Their booked students will get a cancellation email. This cannot be undone.`)) return
+    try { await adminDeleteMentor(token, m.id) } catch (err) { return fail('Failed to remove mentor')(err) }
+    toast({ title: 'Mentor Removed', description: 'The mentor was removed and their students were emailed.' }); load()
   }
   const deleteStudent = async (email: string, name: string) => {
     const mine = bookings.filter((b) => b.student_email === email)
     if (!confirm(`Delete ${name} (${email}) and their ${mine.length} booking(s)? Time slots will reopen.`)) return
-    for (const b of mine) {
-      const { error } = await supabase.rpc('cancel_booking', { p_booking_id: b.id, p_cancelled_by: 'admin', p_reopen_slot: true })
-      if (error) return toast({ title: 'Error', description: 'Failed to cancel student bookings.', variant: 'destructive' })
-    }
-    await supabase.from('student_requests').delete().eq('email', email)
+    try { await adminDeleteStudent(token, email) } catch (err) { return fail('Failed to remove student')(err) }
     toast({ title: 'Student Deleted', description: 'The student and all their bookings have been removed. Time slots are now available.' }); load()
   }
   const saveMentor = async () => {
     if (!editing) return
-    const { id, created_at: _c, ...rest } = editing // eslint-disable-line @typescript-eslint/no-unused-vars
-    const { error } = await supabase.from('mentors').update(rest).eq('id', id)
-    if (error) return toast({ title: 'Error', description: 'Failed to update mentor.', variant: 'destructive' })
+    const { id, name, email, occupation, organization, linkedin_url, meeting_url, tracks, open_to, topics, available_times } = editing
+    try { await adminUpdateMentor(token, id, { name, email, occupation, organization, linkedin_url, meeting_url, tracks, open_to, topics, available_times }) }
+    catch (err) { return fail('Failed to update mentor')(err) }
     toast({ title: 'Mentor Updated', description: 'The mentor information has been updated successfully.' }); setEditing(null); load()
   }
   const matchStudent = async (r: StudentRequest) => {
@@ -92,10 +70,7 @@ export default function Admin() {
     const m = pick?.mentorId ? mentorById.get(pick.mentorId) : undefined
     if (!m || !pick?.time) return toast({ title: 'Pick a mentor and time', description: 'Choose an available mentor + time slot before booking.', variant: 'destructive' })
     if (!m.available_times.includes(pick.time)) { load(); return toast({ title: 'Time slot no longer available', description: 'Please pick another time slot.', variant: 'destructive' }) }
-    const { error } = await supabase.from('bookings').insert({ mentor_id: m.id, student_name: r.name, student_email: r.email, specializations: [], graduation_date: r.class_level, discussion_topics: [], portfolio_url: null, specific_topics: r.goals, selected_time: pick.time })
-    if (error) return toast({ title: 'Booking failed', description: error.message, variant: 'destructive' })
-    await supabase.from('mentors').update({ available_times: m.available_times.filter((t) => t !== pick.time) }).eq('id', m.id)
-    await supabase.from('student_requests').update({ status: 'matched' }).eq('id', r.id)
+    try { await adminMatch(token, r.id, m.id, pick.time) } catch (err) { return fail('Booking failed')(err) }
     toast({ title: 'Student Matched!', description: `${r.name} booked with ${m.name} at ${pick.time}.` })
     setMatch((s) => { const n = { ...s }; delete n[r.id]; return n }); load()
   }
@@ -122,7 +97,7 @@ export default function Admin() {
         <h2 className="text-2xl font-bold">Admin Dashboard</h2>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={exportCsv}><Download className="h-4 w-4" /> Export Bookings CSV</Button>
-          <Button variant="ghost" onClick={() => { sessionStorage.removeItem(SESSION_KEY); nav('/') }}>Log out</Button>
+          <Button variant="ghost" onClick={() => { setToken('admin', null); nav('/') }}>Sign out</Button>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-4 mb-6">
@@ -131,13 +106,13 @@ export default function Admin() {
         ))}
       </div>
       <div className="inline-flex h-10 items-center rounded-md bg-muted p-1 mb-4">
-        {(['bookings', 'mentors', 'students', 'matching'] as Tab[]).map((t) => (
+        {(['bookings', 'mentors', 'students', 'matching', 'admins'] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`rounded-sm px-3 py-1.5 text-sm font-medium capitalize ${tab === t ? 'bg-white shadow-sm' : 'text-muted-foreground'}`}>
             {t === 'matching' ? `Student Matching${unmatched.length ? ` (${unmatched.length})` : ''}` : t}
           </button>
         ))}
       </div>
-      {tab !== 'matching' && <Input placeholder={`Search ${tab} by name or email...`} className="max-w-sm mb-4" value={search} onChange={(e) => setSearch(e.target.value)} />}
+      {tab !== 'matching' && tab !== 'admins' && <Input placeholder={`Search ${tab} by name or email...`} className="max-w-sm mb-4" value={search} onChange={(e) => setSearch(e.target.value)} />}
 
       {tab === 'bookings' && (
         <Card><CardHeader><CardTitle>Booking Management</CardTitle></CardHeader><CardContent>
@@ -166,10 +141,9 @@ export default function Admin() {
               <tr key={m.id}>
                 <Td>{m.name}<div className="text-xs text-muted-foreground">{m.email}{m.occupation ? ` · ${m.occupation}` : ''}{m.organization ? `, ${m.organization}` : ''}</div></Td>
                 <Td><div className="flex flex-wrap gap-1">{(m.tracks || []).map((t) => <Badge key={t} tone="secondary">{t}</Badge>)}</div></Td>
-                <Td><div className="flex flex-wrap gap-1 max-w-xs">{sortTimes(m.available_times || []).map((t) => <button key={t} title="Remove slot" onClick={async () => { if (!confirm(`Remove ${t} from ${m.name}?`)) return; const { error } = await supabase.from('mentors').update({ available_times: m.available_times.filter((x) => x !== t) }).eq('id', m.id); if (error) toast({ title: 'Error', description: 'Failed to delete time slot.', variant: 'destructive' }); else { toast({ title: 'Time Slot Deleted', description: "The time slot has been removed from the mentor's availability." }); load() } }} className="rounded-full bg-muted px-2 py-0.5 text-xs hover:bg-destructive hover:text-white">{t}</button>)}{(m.available_times || []).length === 0 && <span className="text-xs text-muted-foreground">none</span>}</div></Td>
+                <Td><div className="flex flex-wrap gap-1 max-w-xs">{sortTimes(m.available_times || []).map((t) => <button key={t} title="Remove slot" onClick={async () => { if (!confirm(`Remove ${t} from ${m.name}?`)) return; try { await adminUpdateMentor(token, m.id, { available_times: m.available_times.filter((x) => x !== t) }); toast({ title: 'Time Slot Deleted', description: "The time slot has been removed from the mentor's availability." }); load() } catch (err) { fail('Failed to delete time slot')(err) } }} className="rounded-full bg-muted px-2 py-0.5 text-xs hover:bg-destructive hover:text-white">{t}</button>)}{(m.available_times || []).length === 0 && <span className="text-xs text-muted-foreground">none</span>}</div></Td>
                 <Td>{n}</Td>
                 <Td><div className="flex gap-1">
-                  <Button variant="ghost" title="Copy schedule link" onClick={() => copy(`${location.origin}/mentor-schedule?id=${m.id}`, 'Share this link with the mentor to view their schedule.')}><Copy className="h-4 w-4" /></Button>
                   <Button variant="ghost" title="Edit" onClick={() => setEditing({ ...m, tracks: m.tracks || [], open_to: m.open_to || [], topics: m.topics || [], available_times: m.available_times || [] })}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" title="Delete" onClick={() => deleteMentor(m)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </div></Td>
@@ -188,7 +162,6 @@ export default function Admin() {
                   <Td>{s.name}<div className="text-xs text-muted-foreground">{s.email}</div></Td>
                   <Td>{sortTimes(s.bookings.map((b) => b.selected_time)).map((t) => { const b = s.bookings.find((x) => x.selected_time === t)!; return <div key={b.id} className="text-sm">{t} · {mentorById.get(b.mentor_id)?.name || 'Unknown'}</div> })}</Td>
                   <Td><div className="flex gap-1">
-                    <Button variant="ghost" title="Copy schedule link" onClick={() => copy(`${location.origin}/student-schedule?email=${encodeURIComponent(s.email)}`, 'Share this link with the student to view their schedule.')}><Copy className="h-4 w-4" /></Button>
                     <Button variant="ghost" title="Delete" onClick={() => deleteStudent(s.email, s.name)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div></Td>
                 </tr>
@@ -209,6 +182,16 @@ export default function Admin() {
                 <Button onClick={() => matchStudent(r)}>Confirm Booking</Button>
               </div>) })}</div>
           )}
+        </CardContent></Card>
+      )}
+
+      {tab === 'admins' && (
+        <Card><CardHeader><CardTitle>Admins</CardTitle><p className="text-sm text-muted-foreground">People who can sign in to this page. One email per line. You can't remove yourself.</p></CardHeader><CardContent>
+          <form className="space-y-3 max-w-md" onSubmit={async (e) => { e.preventDefault(); try { await adminSetAdmins(token, adminsText.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean)); toast({ title: 'Admins saved' }); setAdminsText(''); load() } catch (err) { fail('Failed to save admins')(err) } }}>
+            <p className="text-sm">Current: {admins.join(', ')}</p>
+            <textarea className="w-full min-h-[100px] rounded-md border border-border bg-white px-3 py-2 text-sm" placeholder={admins.join('\n')} value={adminsText} onChange={(e) => setAdminsText(e.target.value)} />
+            <Button type="submit" disabled={!adminsText.trim()}>Save admin list</Button>
+          </form>
         </CardContent></Card>
       )}
 

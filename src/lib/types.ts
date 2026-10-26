@@ -11,6 +11,7 @@ export interface Mentor {
   open_to: string[]
   topics: string[]
   available_times: string[]
+  deleted_at?: string | null
   created_at?: string
 }
 

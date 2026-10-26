@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Users, GraduationCap, CalendarCheck } from 'lucide-react'
-import { Button, Card, CardContent, HeaderBanner, EventTitle, Input, Modal, useToast } from '../components/ui'
+import { Button, Card, CardContent, HeaderBanner, EventTitle, Modal } from '../components/ui'
+import { SignInForm } from '../components/SignIn'
 import { EVENT } from '../lib/config'
 
 const steps = [
@@ -12,16 +13,9 @@ const steps = [
 
 export default function Home() {
   const nav = useNavigate()
-  const { toast } = useToast()
-  const [mentorOpen, setMentorOpen] = useState(false)
-  const [studentOpen, setStudentOpen] = useState(false)
-  const [mentorEmail, setMentorEmail] = useState('')
-  const [studentEmail, setStudentEmail] = useState('')
-
-  const go = (path: string, email: string) => {
-    if (!email.trim()) return toast({ title: 'Please enter your email', variant: 'destructive' })
-    nav(`${path}?email=${encodeURIComponent(email.trim().toLowerCase())}`)
-  }
+  const [sp] = useSearchParams()
+  const [mentorOpen, setMentorOpen] = useState(sp.get('login') === 'mentor')
+  const [studentOpen, setStudentOpen] = useState(sp.get('login') === 'student')
 
   return (
     <div className="min-h-screen bg-background">
@@ -71,7 +65,7 @@ export default function Home() {
               <CalendarCheck className="h-8 w-8 text-secondary shrink-0" />
               <div>
                 <h3 className="text-lg font-semibold">Check Mentor Schedule</h3>
-                <p className="text-sm text-muted-foreground">View your bookings and manage time slots</p>
+                <p className="text-sm text-muted-foreground">We'll email you a sign-in link to view bookings and manage time slots</p>
               </div>
             </CardContent>
           </Card>
@@ -80,7 +74,7 @@ export default function Home() {
               <GraduationCap className="h-8 w-8 text-secondary shrink-0" />
               <div>
                 <h3 className="text-lg font-semibold">Check Student Schedule</h3>
-                <p className="text-sm text-muted-foreground">View your booked mentorship sessions</p>
+                <p className="text-sm text-muted-foreground">We'll email you a sign-in link to view or cancel your sessions</p>
               </div>
             </CardContent>
           </Card>
@@ -103,17 +97,11 @@ export default function Home() {
         </div>
       </div>
 
-      <Modal open={mentorOpen} onClose={() => setMentorOpen(false)} title="Mentor Schedule" description="Enter your email to view your bookings and manage time slots.">
-        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); go('/mentor-dashboard', mentorEmail) }}>
-          <Input type="email" placeholder="Enter your mentor email" value={mentorEmail} onChange={(e) => setMentorEmail(e.target.value)} />
-          <Button type="submit" className="w-full">View My Schedule</Button>
-        </form>
+      <Modal open={mentorOpen} onClose={() => setMentorOpen(false)} title="Mentor Schedule">
+        <SignInForm role="mentor" />
       </Modal>
-      <Modal open={studentOpen} onClose={() => setStudentOpen(false)} title="Student Schedule" description="Enter your email to view your booked sessions.">
-        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); go('/student-dashboard', studentEmail) }}>
-          <Input type="email" placeholder="Enter your email" value={studentEmail} onChange={(e) => setStudentEmail(e.target.value)} />
-          <Button type="submit" className="w-full">View My Schedule</Button>
-        </form>
+      <Modal open={studentOpen} onClose={() => setStudentOpen(false)} title="Student Schedule">
+        <SignInForm role="student" />
       </Modal>
     </div>
   )

@@ -3,13 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
 import { Page, BackButton, Card, CardHeader, CardTitle, CardContent, Field, Input, Textarea, Select, Button, Badge, ClosedNotice, useToast } from '../components/ui'
 import { EVENT, CLASS_LEVELS, OPEN_TO, sortTimes } from '../lib/config'
-import { supabase, supabaseConfigured } from '../lib/supabase'
-import type { Mentor } from '../lib/types'
+import { listMentors, bookSession, type PublicMentor } from '../lib/api'
 
 export default function StudentBooking() {
   const nav = useNavigate()
   const { toast } = useToast()
-  const [mentors, setMentors] = useState<Mentor[]>([])
+  const [mentors, setMentors] = useState<PublicMentor[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [mentorId, setMentorId] = useState('')
@@ -19,21 +18,20 @@ export default function StudentBooking() {
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((s) => ({ ...s, [k]: v }))
 
   const load = async () => {
-    if (!supabaseConfigured) { setLoading(false); return }
-    const { data, error } = await supabase.from('mentors').select('*').order('name')
-    if (error) toast({ title: 'Error loading mentors', description: error.message, variant: 'destructive' })
-    setMentors((data || []).filter((m) => (m.available_times || []).length > 0).map((m) => ({ ...m, available_times: sortTimes(m.available_times || []) })))
+    try {
+      const data = await listMentors()
+      setMentors(data.filter((m) => (m.available_times || []).length > 0).map((m) => ({ ...m, available_times: sortTimes(m.available_times || []) })))
+    } catch (err) {
+      toast({ title: 'Error loading mentors', description: (err as Error).message, variant: 'destructive' })
+    }
     setLoading(false)
   }
 
   useEffect(() => {
     if (!EVENT.studentBookingOpen) return
     load()
-    const ch = supabase.channel('booking-page')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mentors' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, load)
-      .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    const i = setInterval(load, 15000) // keep open slots fresh
+    return () => clearInterval(i)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -56,22 +54,18 @@ export default function StudentBooking() {
     e.preventDefault()
     if (!selected || !time) return toast({ title: 'Pick a mentor and time', description: 'Choose an available mentor + time slot before booking.', variant: 'destructive' })
     setSaving(true)
-    // Re-check availability right before booking.
-    const { data: fresh } = await supabase.from('mentors').select('available_times').eq('id', selected.id).single()
-    if (!fresh || !(fresh.available_times || []).includes(time)) {
-      setSaving(false); setTime(''); await load()
-      return toast({ title: 'Time slot no longer available', description: 'Please pick another time slot.', variant: 'destructive' })
+    try {
+      // The database checks the slot is still open, takes it, and sends the emails + calendar invites.
+      const booking = await bookSession({
+        mentor_id: selected.id, student_name: f.name, student_email: f.email, graduation_date: f.classLevel,
+        discussion_topics: f.topics, portfolio_url: f.portfolioUrl, specific_topics: f.specificTopics, selected_time: time,
+      })
+      nav('/student-confirmation', { state: { booking } })
+    } catch (err) {
+      setTime(''); load()
+      toast({ title: 'Booking failed', description: (err as Error).message, variant: 'destructive' })
     }
-    const email = f.email.trim().toLowerCase()
-    const { data: booking, error } = await supabase.from('bookings').insert({
-      mentor_id: selected.id, student_name: f.name.trim(), student_email: email, specializations: [],
-      graduation_date: f.classLevel || null, discussion_topics: f.topics, portfolio_url: f.portfolioUrl.trim() || null,
-      specific_topics: f.specificTopics.trim() || null, selected_time: time,
-    }).select('id').single()
-    if (error) { setSaving(false); return toast({ title: 'Booking failed', description: error.message, variant: 'destructive' }) }
-    // Confirmation emails + calendar invites are sent automatically by the database.
     setSaving(false)
-    nav(`/student-confirmation?id=${booking.id}`)
   }
 
   return (
@@ -84,8 +78,7 @@ export default function StudentBooking() {
             <Input placeholder="Search by name, track, or topic…" className="max-w-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           {loading && <p className="text-muted-foreground">Loading mentors…</p>}
-          {!loading && !supabaseConfigured && <p className="text-destructive text-sm">Supabase is not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.</p>}
-          {!loading && supabaseConfigured && filtered.length === 0 && <p className="text-muted-foreground">No mentors with open time slots right now. Check back soon.</p>}
+          {!loading && filtered.length === 0 && <p className="text-muted-foreground">No mentors with open time slots right now. Check back soon.</p>}
           <div className="grid gap-4 md:grid-cols-2">
             {filtered.map((m) => {
               const on = m.id === mentorId
