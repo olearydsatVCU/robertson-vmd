@@ -195,9 +195,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[100] flex w-full max-w-sm flex-col gap-2">
+      <div className="fixed bottom-4 left-4 right-4 sm:left-auto z-[100] flex sm:w-full sm:max-w-sm flex-col gap-2" role="status" aria-live="polite">
         {items.map((t) => (
-          <div key={t.id} className={cn('rounded-md border p-4 shadow-lg bg-white', t.variant === 'destructive' && 'border-destructive bg-destructive text-white')}>
+          <div key={t.id} className={cn('rounded-md border p-4 shadow-lg', t.variant === 'destructive' ? 'border-destructive bg-destructive text-white' : 'border-border bg-white text-foreground')}>
             <div className="font-semibold text-sm">{t.title}</div>
             {t.description && <div className="text-sm opacity-90 mt-1">{t.description}</div>}
           </div>
