@@ -35,6 +35,13 @@ export default function Admin() {
   }
   useEffect(() => { if (!token) return; load(); const i = setInterval(load, 10000); return () => clearInterval(i) }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // All hooks must run before any early return (React rule).
+  const students = useMemo(() => {
+    const q = search.toLowerCase()
+    const map = new Map<string, { name: string; email: string; bookings: Booking[] }>()
+    for (const b of bookings) { const s = map.get(b.student_email) || { name: b.student_name, email: b.student_email, bookings: [] }; s.bookings.push(b); map.set(b.student_email, s) }
+    return [...map.values()].filter((s) => !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q))
+  }, [bookings, search])
   if (!token) return <SignInPage role="admin" reason={authError} />
   const fail = (title: string) => (err: unknown) => toast({ title, description: (err as Error).message, variant: 'destructive' })
 
@@ -82,11 +89,6 @@ export default function Admin() {
   }
 
   /* ---- derived ---- */
-  const students = useMemo(() => {
-    const map = new Map<string, { name: string; email: string; bookings: Booking[] }>()
-    for (const b of bookings) { const s = map.get(b.student_email) || { name: b.student_name, email: b.student_email, bookings: [] }; s.bookings.push(b); map.set(b.student_email, s) }
-    return [...map.values()].filter((s) => !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q))
-  }, [bookings, q])
   const filteredMentors = mentors.filter((m) => !q || m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
   const filteredBookings = bookings.filter((b) => !q || [b.student_name, b.student_email, mentorById.get(b.mentor_id)?.name].join(' ').toLowerCase().includes(q))
   const unmatched = requests.filter((r) => r.status === 'unmatched')
