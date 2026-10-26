@@ -23,7 +23,7 @@ create or replace function public.vmd_notify(kind text, rec_id uuid) returns voi
 language plpgsql security definer set search_path = public as $$
 begin
   perform net.http_post(
-    url := 'https://sepkrzmipcnbwmlalraf.supabase.co/functions/v1/notify',
+    url := 'https://bskdqzkcneuuqerhltrv.supabase.co/functions/v1/notify',
     body := jsonb_build_object('type', kind, 'id', rec_id),
     headers := '{"Content-Type":"application/json"}'::jsonb
   );
@@ -95,7 +95,7 @@ revoke execute on function public.vmd_notify(text, uuid) from public, anon, auth
 -- Reminder check every 10 minutes.
 select cron.schedule('vmd-reminders', '*/10 * * * *', $cron$
   select net.http_post(
-    url := 'https://sepkrzmipcnbwmlalraf.supabase.co/functions/v1/notify',
+    url := 'https://bskdqzkcneuuqerhltrv.supabase.co/functions/v1/notify',
     body := '{"type":"reminders"}'::jsonb,
     headers := '{"Content-Type":"application/json"}'::jsonb
   )
