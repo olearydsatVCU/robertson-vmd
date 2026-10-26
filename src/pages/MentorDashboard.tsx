@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Page, Card, CardHeader, CardTitle, CardContent, Button, Badge, Input, Table, Th, Td, useToast } from '../components/ui'
+import { Page, Card, CardHeader, CardTitle, CardContent, Button, Badge, Input, Modal, Table, Th, Td, useToast } from '../components/ui'
 import { SignInPage } from '../components/SignIn'
 import { EVENT, TIME_SLOTS, sortTimes } from '../lib/config'
 import { getMentorSchedule, mentorUpdate, mentorCancel, takeTokenFromUrl, setToken } from '../lib/api'
@@ -17,6 +17,7 @@ export default function MentorDashboard() {
   const [toAdd, setToAdd] = useState<string[]>([])
   const [meeting, setMeeting] = useState('')
   const [busy, setBusy] = useState(false)
+  const [cancelling, setCancelling] = useState<Booking | null>(null)
 
   const load = async () => {
     if (!token) return
@@ -44,10 +45,11 @@ export default function MentorDashboard() {
     setBusy(false)
   }
   const saveTimes = (next: string[], msg: string) => run(() => mentorUpdate(token, { available_times: next }), msg)
-  const cancel = (b: Booking) => {
-    if (!confirm(`Cancel your ${b.selected_time} session with ${b.student_name}? They'll get an email.`)) return
-    const reopen = confirm('Reopen this time slot so another student can book it?')
-    run(() => mentorCancel(token, b.id, reopen), 'Session cancelled. The student has been emailed.')
+  const cancel = (b: Booking) => setCancelling(b)
+  const confirmCancel = (reopen: boolean) => {
+    const b = cancelling
+    setCancelling(null)
+    if (b) run(() => mentorCancel(token, b.id, reopen), reopen ? 'Session cancelled. The student has been emailed and the slot is open again.' : 'Session cancelled. The student has been emailed.')
   }
 
   return (
@@ -95,13 +97,13 @@ export default function MentorDashboard() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Available Time Slots</CardTitle><p className="text-sm text-muted-foreground">Open slots students can still book. Click one to remove it.</p></CardHeader>
+          <CardHeader><CardTitle>Available Time Slots (Eastern Time)</CardTitle><p className="text-sm text-muted-foreground">Open slots students can still book. Click one to remove it.</p></CardHeader>
           <CardContent className="space-y-6">
             {available.length === 0 ? <p className="text-muted-foreground">No available time slots</p> : (
               <div className="flex flex-wrap gap-2">
                 {available.map((t) => (
                   <button key={t} disabled={busy} onClick={() => confirm(`Remove ${t} from your availability?`) && saveTimes(available.filter((x) => x !== t), 'Time slot removed')}
-                    className="rounded-full border border-secondary bg-secondary/10 px-3 py-1 text-sm hover:bg-destructive hover:text-white hover:border-destructive" title="Remove">
+                    className="rounded-full border border-secondary bg-secondary/10 px-3 py-1 text-sm hover:bg-destructive hover:text-white hover:border-destructive" title={`Remove ${t}`} aria-label={`Remove ${t} from your available times`}>
                     {t} ×
                   </button>
                 ))}
@@ -123,6 +125,16 @@ export default function MentorDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Modal open={!!cancelling} onClose={() => setCancelling(null)} title="Cancel this session?"
+        description={cancelling ? `${cancelling.student_name} at ${cancelling.selected_time} ET. They'll get a cancellation email.` : undefined}>
+        <p className="text-sm mb-4">Should another student be able to book this time?</p>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button className="flex-1" disabled={busy} onClick={() => confirmCancel(true)}>Cancel and reopen the slot</Button>
+          <Button variant="outline" className="flex-1" disabled={busy} onClick={() => confirmCancel(false)}>Cancel and keep it closed</Button>
+        </div>
+        <Button variant="ghost" className="w-full mt-2" onClick={() => setCancelling(null)}>Keep the session</Button>
+      </Modal>
     </Page>
   )
 }

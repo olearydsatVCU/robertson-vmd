@@ -115,7 +115,7 @@ export default function StudentBooking() {
                     {mentors.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </Select>
                 </Field>
-                <Field label="Time">
+                <Field label="Time (Eastern Time)">
                   <Select value={time} onChange={(e) => setTime(e.target.value)} disabled={!selected}>
                     <option value="">Choose a time</option>
                     {selected?.available_times.map((t) => <option key={t} value={t}>{t}</option>)}

@@ -63,7 +63,7 @@ export default function MentorRegistration() {
             <Field label="Open to"><CheckboxGroup options={OPEN_TO} value={f.openTo} onChange={(v) => set('openTo', v)} /></Field>
             <Field label="Topics you can speak to"><CheckboxGroup options={TOPICS} value={f.topics} onChange={(v) => set('topics', v)} /></Field>
 
-            <Field label={`Available times on ${EVENT.dateShort} *`} hint="Each slot is a 30-minute 1-on-1 session.">
+            <Field label={`Available times on ${EVENT.dateShort} (Eastern Time) *`} hint="Each slot is a 30-minute 1-on-1 session. Times are Eastern Time (ET), so convert if you're in another time zone.">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {TIME_SLOTS.map((t) => {
                   const on = f.availableTimes.includes(t)
