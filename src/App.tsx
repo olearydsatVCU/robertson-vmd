@@ -14,7 +14,7 @@ import NotFound from './pages/NotFound'
 export default function App() {
   return (
     <ToastProvider>
-      <Router>
+      <Router basename={import.meta.env.VITE_SINGLE_FILE ? undefined : import.meta.env.BASE_URL.replace(/\/$/, '')}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/mentor-registration" element={<MentorRegistration />} />

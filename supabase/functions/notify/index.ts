@@ -13,7 +13,7 @@ const UTC_OFFSET = '-05:00' // Eastern Standard Time in November
 const EVENT_LABEL = 'Friday, November 13, 2026'
 const SESSION_MINUTES = 30
 const REMINDER_MINUTES = 60
-const SITE = (Deno.env.get('SITE_URL') ?? 'https://robertson-vmd.vercel.app').replace(/\/$/, '')
+const SITE = (Deno.env.get('SITE_URL') ?? 'https://olearydsatvcu.github.io/robertson-vmd').replace(/\/$/, '')
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const GMAIL_USER = Deno.env.get('GMAIL_USER') ?? ''
