@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useState, type ReactNode, type 
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, X } from 'lucide-react'
 import { EVENT } from '../lib/config'
-import headerImg from '../assets/mentorship-header.jpg'
+import headerImg from '../assets/mentorship-header.png'
 
 export function cn(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(' ')
