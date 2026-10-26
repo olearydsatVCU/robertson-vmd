@@ -26,7 +26,7 @@ export default function Admin() {
 
   const load = async () => {
     const [b, m, r] = await Promise.all([
-      supabase.from('bookings').select('*').order('created_at', { ascending: false }),
+      supabase.from('bookings').select('*').is('cancelled_at', null).order('created_at', { ascending: false }),
       supabase.from('mentors').select('*').order('name'),
       supabase.from('student_requests').select('*').order('created_at', { ascending: false }),
     ])
@@ -57,12 +57,10 @@ export default function Admin() {
 
   /* ---- actions ---- */
   const deleteBooking = async (b: Booking) => {
-    if (!confirm(`Delete ${b.student_name}'s booking with ${mentorById.get(b.mentor_id)?.name} at ${b.selected_time}? The slot will reopen.`)) return
-    const { error } = await supabase.from('bookings').delete().eq('id', b.id)
-    if (error) return toast({ title: 'Error', description: 'Failed to delete booking.', variant: 'destructive' })
-    const m = mentorById.get(b.mentor_id)
-    if (m && !m.available_times.includes(b.selected_time)) await supabase.from('mentors').update({ available_times: [...m.available_times, b.selected_time] }).eq('id', m.id)
-    toast({ title: 'Booking Deleted', description: 'The booking has been removed and the time slot is now available.' }); load()
+    if (!confirm(`Delete ${b.student_name}'s booking with ${mentorById.get(b.mentor_id)?.name} at ${b.selected_time}? The slot will reopen and both people get a cancellation email.`)) return
+    const { error } = await supabase.rpc('cancel_booking', { p_booking_id: b.id, p_cancelled_by: 'admin', p_reopen_slot: true })
+    if (error) return toast({ title: 'Error', description: 'Failed to cancel booking.', variant: 'destructive' })
+    toast({ title: 'Booking Cancelled', description: 'Both people were emailed and the time slot is open again.' }); load()
   }
   const deleteMentor = async (m: Mentor) => {
     if (!confirm(`Delete mentor ${m.name} and ALL of their bookings? This cannot be undone.`)) return
@@ -76,11 +74,9 @@ export default function Admin() {
     const mine = bookings.filter((b) => b.student_email === email)
     if (!confirm(`Delete ${name} (${email}) and their ${mine.length} booking(s)? Time slots will reopen.`)) return
     for (const b of mine) {
-      const m = mentorById.get(b.mentor_id)
-      if (m && !m.available_times.includes(b.selected_time)) await supabase.from('mentors').update({ available_times: [...m.available_times, b.selected_time] }).eq('id', m.id)
+      const { error } = await supabase.rpc('cancel_booking', { p_booking_id: b.id, p_cancelled_by: 'admin', p_reopen_slot: true })
+      if (error) return toast({ title: 'Error', description: 'Failed to cancel student bookings.', variant: 'destructive' })
     }
-    const { error } = await supabase.from('bookings').delete().eq('student_email', email)
-    if (error) return toast({ title: 'Error', description: 'Failed to delete student bookings.', variant: 'destructive' })
     await supabase.from('student_requests').delete().eq('email', email)
     toast({ title: 'Student Deleted', description: 'The student and all their bookings have been removed. Time slots are now available.' }); load()
   }

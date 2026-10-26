@@ -9,6 +9,13 @@ cp .env.example .env   # then fill in Supabase URL/anon key + admin password
 npm run dev
 ```
 
+## Live setup (Fall 2026)
+- Hosting: Vercel (imports this repo; `vercel.json` handles page routes). No env vars needed except `VITE_ADMIN_PASSWORD`.
+- Database: Supabase project `sepkrzmipcnbwmlalraf` (migrations in `supabase/migrations`).
+- Emails: `supabase/functions/notify` sends mentor sign-up, booking confirmation (with calendar invite), 1-hour reminder, and cancellation emails through Gmail. Database triggers call it automatically.
+  Secrets in Supabase → Edge Functions → Secrets: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, optional `SITE_URL`.
+- Changing the event date: update `EVENT` in `src/lib/config.ts` **and** `EVENT_DATE` / `EVENT_LABEL` in `supabase/functions/notify/index.ts`.
+
 ## Supabase setup
 1. Create a project at supabase.com.
 2. Run `supabase/migrations/0001_init.sql` in the SQL editor.

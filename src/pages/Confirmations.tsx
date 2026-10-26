@@ -64,7 +64,7 @@ export function StudentConfirmation() {
           <dl className="grid gap-2 text-sm sm:grid-cols-[160px_1fr]">
             <dt className="text-muted-foreground">Mentor</dt><dd>{b.mentor?.name} {b.mentor?.occupation && <span className="text-muted-foreground">· {b.mentor.occupation}{b.mentor.organization ? `, ${b.mentor.organization}` : ''}</span>}</dd>
             <dt className="text-muted-foreground">Session Time</dt><dd>{EVENT.dateLong}, {b.selected_time}</dd>
-            <dt className="text-muted-foreground">Meeting Link</dt><dd>{b.mentor?.meeting_url ? <a className="text-secondary hover:underline" href={b.mentor.meeting_url}>{b.mentor.meeting_url}</a> : 'Your mentor will share a link.'}</dd>
+            <dt className="text-muted-foreground">Meeting Link</dt><dd>{b.meeting_url ? <a className="text-secondary hover:underline" href={b.meeting_url} target="_blank" rel="noreferrer">{b.meeting_url}</a> : 'Check your email for the link.'}</dd>
             {b.discussion_topics?.length > 0 && <><dt className="text-muted-foreground">Discussion Topics</dt><dd>{b.discussion_topics.join(', ')}</dd></>}
             {b.specific_topics && <><dt className="text-muted-foreground">Specific Topics</dt><dd>{b.specific_topics}</dd></>}
           </dl>

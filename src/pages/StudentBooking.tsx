@@ -69,13 +69,7 @@ export default function StudentBooking() {
       specific_topics: f.specificTopics.trim() || null, selected_time: time,
     }).select('id').single()
     if (error) { setSaving(false); return toast({ title: 'Booking failed', description: error.message, variant: 'destructive' }) }
-    await supabase.from('mentors').update({ available_times: fresh.available_times.filter((t: string) => t !== time) }).eq('id', selected.id)
-    // Fire-and-forget confirmation email (edge function; safe to fail).
-    supabase.functions.invoke('send-booking-email', { body: {
-      studentName: f.name.trim(), studentEmail: email, mentorId: selected.id, mentorName: selected.name, mentorEmail: selected.email,
-      sessionTime: time, discussionTopics: f.topics, portfolioUrl: f.portfolioUrl, specificTopics: f.specificTopics,
-      mentorLinkedIn: selected.linkedin_url, mentorMeetingLink: selected.meeting_url, graduationDate: f.classLevel, specializations: [],
-    } }).catch(() => {})
+    // Confirmation emails + calendar invites are sent automatically by the database.
     setSaving(false)
     nav(`/student-confirmation?id=${booking.id}`)
   }

@@ -25,6 +25,9 @@ export interface Booking {
   portfolio_url: string | null
   specific_topics: string | null
   selected_time: string
+  meeting_url: string | null
+  cancelled_at: string | null
+  cancelled_by: string | null
   created_at: string
 }
 

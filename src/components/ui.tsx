@@ -11,7 +11,7 @@ export function cn(...c: (string | false | null | undefined)[]) {
 /* ---------- Buttons / inputs ---------- */
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive'
 export function Button({ variant = 'primary', className, ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
-  const base = 'inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+  const base = 'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
   const v: Record<Variant, string> = {
     primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
     secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/90',
@@ -70,7 +70,7 @@ export function Badge({ children, tone = 'muted' }: { children: ReactNode; tone?
 /* ---------- Cards ---------- */
 export function Card({ className, children, onClick }: { className?: string; children: ReactNode; onClick?: () => void }) {
   return (
-    <div onClick={onClick} className={cn('rounded-xl border border-border bg-white shadow-[0_4px_16px_-4px_rgb(0_0_0/0.08)]', onClick && 'cursor-pointer transition-shadow hover:shadow-[0_8px_24px_-8px_hsl(45_100%_51%/0.4)]', className)}>
+    <div onClick={onClick} className={cn('rounded-2xl border border-border bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-12px_rgb(0_0_0/0.12)]', onClick && 'cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:shadow-[0_16px_32px_-16px_hsl(42_100%_50%/0.55)]', className)}>
       {children}
     </div>
   )
@@ -96,10 +96,11 @@ export function HeaderBanner() {
 export function EventTitle() {
   return (
     <div className="text-center mb-8">
-      <h1 className="text-3xl font-bold mb-2">{EVENT.title}</h1>
-      <p className="text-muted-foreground">
-        {EVENT.term} | {EVENT.dateLong} | {EVENT.time}
+      <p className="inline-flex items-center gap-2 rounded-full bg-foreground px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary mb-4">
+        {EVENT.term} · {EVENT.dateLong}
       </p>
+      <h1 className="text-3xl sm:text-4xl font-extrabold mb-2 px-4">{EVENT.title}</h1>
+      <p className="text-muted-foreground">{EVENT.time} · 30-minute 1-on-1 sessions</p>
     </div>
   )
 }

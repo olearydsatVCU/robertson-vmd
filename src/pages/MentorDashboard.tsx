@@ -22,7 +22,7 @@ export default function MentorDashboard() {
     const { data } = id ? await q.eq('id', id).maybeSingle() : await q.eq('email', email!).maybeSingle()
     setMentor(data)
     if (data) {
-      const { data: b } = await supabase.from('bookings').select('*').eq('mentor_id', data.id)
+      const { data: b } = await supabase.from('bookings').select('*').eq('mentor_id', data.id).is('cancelled_at', null)
       setBookings(sortTimes((b || []).map((x) => x.selected_time)).map((t) => (b || []).find((x) => x.selected_time === t)!))
     }
   }
@@ -45,6 +45,14 @@ export default function MentorDashboard() {
   const booked = new Set(bookings.map((b) => b.selected_time))
   const available = sortTimes(mentor.available_times || [])
   const addable = TIME_SLOTS.filter((t) => !available.includes(t) && !booked.has(t))
+
+  const cancel = async (b: Booking) => {
+    if (!confirm(`Cancel your ${b.selected_time} session with ${b.student_name}? They'll get an email.`)) return
+    const reopen = confirm('Reopen this time slot so another student can book it?')
+    const { error } = await supabase.rpc('cancel_booking', { p_booking_id: b.id, p_cancelled_by: 'mentor', p_reopen_slot: reopen })
+    if (error) return toast({ title: 'Could not cancel', description: error.message, variant: 'destructive' })
+    toast({ title: 'Session cancelled', description: 'The student has been emailed.' }); load()
+  }
 
   const saveTimes = async (next: string[], msg: string) => {
     setBusy(true)
@@ -74,7 +82,7 @@ export default function MentorDashboard() {
           <CardContent>
             {bookings.length === 0 ? <p className="text-muted-foreground">No sessions booked yet</p> : (
               <Table>
-                <thead><tr><Th>Time Slot</Th><Th>Student</Th><Th>Email</Th><Th>Class</Th><Th>Discussion Topics</Th><Th>Booked At</Th></tr></thead>
+                <thead><tr><Th>Time Slot</Th><Th>Student</Th><Th>Email</Th><Th>Class</Th><Th>Discussion Topics</Th><Th>Meeting</Th><Th></Th></tr></thead>
                 <tbody>{bookings.map((b) => (
                   <tr key={b.id}>
                     <Td className="font-medium whitespace-nowrap">{b.selected_time}</Td>
@@ -82,7 +90,8 @@ export default function MentorDashboard() {
                     <Td><a className="text-secondary hover:underline" href={`mailto:${b.student_email}`}>{b.student_email}</a></Td>
                     <Td>{b.graduation_date || 'N/A'}</Td>
                     <Td>{[...(b.discussion_topics || []), b.specific_topics].filter(Boolean).join('; ') || 'N/A'}</Td>
-                    <Td className="whitespace-nowrap text-muted-foreground">{new Date(b.created_at).toLocaleString()}</Td>
+                    <Td>{b.meeting_url ? <a className="text-secondary hover:underline font-medium" href={b.meeting_url} target="_blank" rel="noreferrer">Join</a> : 'N/A'}</Td>
+                    <Td><Button variant="outline" className="h-8 px-3" onClick={() => cancel(b)}>Cancel</Button></Td>
                   </tr>
                 ))}</tbody>
               </Table>

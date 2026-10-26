@@ -1,10 +1,12 @@
 // Event-wide settings. Edit these to open/close registration and booking.
 export const EVENT = {
   title: 'VCU Robertson School Virtual Mentorship Day',
-  term: 'Spring 2026',
-  dateLong: 'Wednesday, April 15th',
-  dateShort: 'April 15th',
-  time: 'All Day',
+  term: 'Fall 2026',
+  dateLong: 'Friday, November 13th',
+  dateShort: 'November 13th',
+  time: 'All Day (Eastern Time)',
+  // Also update EVENT_DATE in supabase/functions/notify/index.ts when this changes.
+  dateISO: '2026-11-13',
   contacts: [
     { name: 'Jay Adams', title: 'Associate Professor at Robertson', email: 'jwadams@vcu.edu' },
     { name: "Derek O'Leary", title: 'Assistant Professor at Robertson', email: 'olearyds@vcu.edu' },
