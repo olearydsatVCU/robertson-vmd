@@ -87,7 +87,13 @@ function layout(heading: string, body: string) {
   <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:12px;overflow:hidden">
     <tr><td style="background:#111;color:#FFB300;padding:18px 24px;font-weight:700;font-size:14px;letter-spacing:.04em">VCU ROBERTSON · VIRTUAL MENTORSHIP DAY</td></tr>
     <tr><td style="padding:28px 24px 8px"><h1 style="margin:0 0 12px;font-size:22px">${heading}</h1>${body}</td></tr>
-    <tr><td style="padding:16px 24px 28px;font-size:12px;color:#666">Questions? Reply to this email. Event day: ${EVENT_LABEL} (Eastern Time).</td></tr>
+    <tr><td style="padding:16px 24px 8px;font-size:14px;color:#111;border-top:1px solid #eee">
+      <b>Derek O'Leary</b><br>
+      <span style="color:#555">Assistant Professor, Advertising and Robertson Virtual Mentorship Day lead<br>
+      Robertson School of Communication at VCU<br>
+      <a href="mailto:robertsonvmd@gmail.com" style="color:#6b2b5b">robertsonvmd@gmail.com</a></span>
+    </td></tr>
+    <tr><td style="padding:8px 24px 28px;font-size:12px;color:#666">Questions? Reply to this email. Event day: ${EVENT_LABEL} (Eastern Time).</td></tr>
   </table></td></tr></table></body></html>`
 }
 
