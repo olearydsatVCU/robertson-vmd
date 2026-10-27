@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Page, Card, CardHeader, CardTitle, CardContent, Button, Badge, UrlInput, Modal, Table, Th, Td, useToast } from '../components/ui'
 import { SignInPage } from '../components/SignIn'
+import { PhotoPicker } from '../components/PhotoPicker'
 import { EVENT, TIME_SLOTS, sortTimes } from '../lib/config'
 import { getMentorSchedule, mentorUpdate, mentorCancel, takeTokenFromUrl, setToken } from '../lib/api'
 import type { Booking, Mentor } from '../lib/types'
@@ -71,6 +72,10 @@ export default function MentorDashboard() {
               <Button type="submit" variant="outline" disabled={busy || meeting === (mentor.meeting_url || '')}>Save</Button>
             </form>
             <p className="sm:col-span-2 text-xs text-muted-foreground">Leave the meeting link blank and each booking gets its own free video link automatically. Links in confirmation emails already sent won't change.</p>
+            <div className="sm:col-span-2 pt-2 border-t border-border">
+              <p className="font-medium mb-2">Your photo</p>
+              <PhotoPicker name={mentor.name} value={mentor.image_url || ''} onChange={(v) => run(() => mentorUpdate(token, { image_url: v }), v ? 'Photo saved' : 'Photo removed')} />
+            </div>
           </CardContent>
         </Card>
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Page, BackButton, Card, CardHeader, CardTitle, CardContent, Field, Input, UrlInput, Button, CheckboxGroup, ClosedNotice, useToast } from '../components/ui'
 import { EVENT, TRACKS, OPEN_TO, TOPICS, TIME_SLOTS } from '../lib/config'
 import { registerMentor } from '../lib/api'
+import { PhotoPicker } from '../components/PhotoPicker'
 
 export default function MentorRegistration() {
   const nav = useNavigate()
@@ -56,8 +57,8 @@ export default function MentorRegistration() {
               <Field label="Organization"><Input value={f.organization} onChange={(e) => set('organization', e.target.value)} /></Field>
               <Field label="LinkedIn URL"><UrlInput placeholder="linkedin.com/in/yourname" value={f.linkedIn} onChange={(v) => set('linkedIn', v)} /></Field>
               <Field label="Meeting Link (Zoom / Google Meet)" hint="Students will use this link to join your session."><UrlInput placeholder="zoom.us/j/123456789" value={f.meetingUrl} onChange={(v) => set('meetingUrl', v)} /></Field>
-              <Field label="Headshot image URL (optional)"><UrlInput placeholder="Link to a photo of you" value={f.imageUrl} onChange={(v) => set('imageUrl', v)} /></Field>
             </div>
+            <Field label="Headshot (optional)"><PhotoPicker value={f.imageUrl} onChange={(v) => set('imageUrl', v)} name={f.name} /></Field>
 
             <Field label="Tracks"><CheckboxGroup options={TRACKS} value={f.tracks} onChange={(v) => set('tracks', v)} /></Field>
             <Field label="Open to"><CheckboxGroup options={OPEN_TO} value={f.openTo} onChange={(v) => set('openTo', v)} /></Field>
