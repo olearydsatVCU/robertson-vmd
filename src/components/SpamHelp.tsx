@@ -26,7 +26,7 @@ export function SpamHelp({ role }: { role: 'mentor' | 'student' }) {
             : <p className="text-muted-foreground">Using a work email? If it's not in Junk either, your company may be holding it. Ask your IT team to allow emails from {from}.</p>}
         </div>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2 items-start">
         {STEPS.map((s) => (
           <details key={s.app} className="rounded-lg bg-white border border-border px-3 py-2">
             <summary className="cursor-pointer font-medium">{s.app}</summary>
