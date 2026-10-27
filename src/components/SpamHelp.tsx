@@ -25,13 +25,14 @@ export function SpamHelp({ role, email }: { role: 'mentor' | 'student'; email: s
         <div className="space-y-2">
           <p className="text-xs font-bold uppercase tracking-wider text-secondary">Do this now</p>
           <h3 id="find-email" className="text-xl font-bold leading-snug">Find your confirmation email. It's probably in your spam folder.</h3>
-          <p>We just emailed <b className="break-all">{email}</b>. Because we're a new sender, most email services put our first email in <b>Spam</b> or <b>Junk</b>.</p>
+          <p>We just emailed <b className="break-all">{email}</b>. Because we're a new sender, most email services put our first email in your <b>spam / junk folder</b>.</p>
           <p><b>Open it and mark it "Not spam."</b> If you skip this, {upcoming} may land in spam too, and you could miss them.</p>
+          <p><b>You may need to do this for each email.</b> Our emails can show up as "{EVENT.senderName}" or just as {EVENT.senderEmail || 'our address'}, so your email app may treat them separately. If a later one lands in <b>spam / junk</b>, mark that one "Not spam" too. Adding {EVENT.senderEmail || 'our address'} to your contacts usually stops this.</p>
         </div>
       </div>
 
       <dl className="grid gap-1 rounded-lg bg-white border border-border p-3 text-sm sm:grid-cols-[90px_1fr]">
-        <dt className="text-muted-foreground">From</dt><dd className="font-medium break-all">{EVENT.senderName}{EVENT.senderEmail && <> ({EVENT.senderEmail})</>}</dd>
+        <dt className="text-muted-foreground">From</dt><dd className="font-medium break-all">{EVENT.senderName}{EVENT.senderEmail && <> or {EVENT.senderEmail}</>}</dd>
         <dt className="text-muted-foreground">Subject</dt><dd className="font-medium">{SUBJECT[role]}</dd>
       </dl>
 

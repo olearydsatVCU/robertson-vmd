@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { MailWarning } from 'lucide-react'
 import { Page, BackButton, Card, CardHeader, CardTitle, CardContent, Field, Input, UrlInput, Button, CheckboxGroup, ClosedNotice, useToast } from '../components/ui'
 import { EVENT, TRACKS, OPEN_TO, TOPICS, TIME_SLOTS } from '../lib/config'
 import { registerMentor } from '../lib/api'
@@ -79,7 +80,10 @@ export default function MentorRegistration() {
             </Field>
 
             <Button type="submit" className="w-full" disabled={saving}>{saving ? 'Submitting…' : 'Submit Registration'}</Button>
-            <p className="text-xs text-muted-foreground text-center">We'll email you a confirmation right away. Check your spam or junk folder if you don't see it.</p>
+            <div className="flex items-start gap-2 rounded-lg border-2 border-secondary bg-secondary/5 p-3 text-sm" role="note">
+              <MailWarning className="h-5 w-5 shrink-0 text-secondary" aria-hidden />
+              <p>We'll email your confirmation right away. <b>Check your spam / junk folder</b>. That's where it usually lands.</p>
+            </div>
           </form>
         </CardContent>
       </Card>

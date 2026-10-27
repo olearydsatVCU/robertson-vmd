@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, MailWarning } from 'lucide-react'
 import { Page, BackButton, Card, CardHeader, CardTitle, CardContent, Field, Input, UrlInput, Textarea, Select, Button, Badge, ClosedNotice, useToast } from '../components/ui'
 import { EVENT, CLASS_LEVELS, OPEN_TO, sortTimes } from '../lib/config'
 import { listMentors, bookSession, type PublicMentor } from '../lib/api'
@@ -141,7 +141,10 @@ export default function StudentBooking() {
                 <Field label="Portfolio / LinkedIn URL"><UrlInput placeholder="linkedin.com/in/yourname" value={f.portfolioUrl} onChange={(v) => set('portfolioUrl', v)} /></Field>
                 <Field label="Anything specific you'd like to cover?"><Textarea value={f.specificTopics} onChange={(e) => set('specificTopics', e.target.value)} /></Field>
                 <Button type="submit" variant="secondary" className="w-full" disabled={saving}>{saving ? 'Booking…' : 'Book Session'}</Button>
-            <p className="text-xs text-muted-foreground text-center">We'll email you a confirmation right away. Check your spam or junk folder if you don't see it.</p>
+            <div className="flex items-start gap-2 rounded-lg border-2 border-secondary bg-secondary/5 p-3 text-sm" role="note">
+              <MailWarning className="h-5 w-5 shrink-0 text-secondary" aria-hidden />
+              <p>We'll email your confirmation right away. <b>Check your spam / junk folder</b>. That's where it usually lands.</p>
+            </div>
               </form>
             </CardContent>
           </Card>
