@@ -141,6 +141,7 @@ export default function StudentBooking() {
                 <Field label="Portfolio / LinkedIn URL"><UrlInput placeholder="linkedin.com/in/yourname" value={f.portfolioUrl} onChange={(v) => set('portfolioUrl', v)} /></Field>
                 <Field label="Anything specific you'd like to cover?"><Textarea value={f.specificTopics} onChange={(e) => set('specificTopics', e.target.value)} /></Field>
                 <Button type="submit" variant="secondary" className="w-full" disabled={saving}>{saving ? 'Booking…' : 'Book Session'}</Button>
+            <p className="text-xs text-muted-foreground text-center">We'll email you a confirmation right away. Check your spam or junk folder if you don't see it.</p>
               </form>
             </CardContent>
           </Card>

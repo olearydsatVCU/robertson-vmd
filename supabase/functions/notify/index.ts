@@ -1,6 +1,6 @@
 // Supabase Edge Function: all Virtual Mentorship Day emails.
 // Called by the database (triggers + a 10-minute reminder job), never by the browser.
-// Body: { type: 'mentor_signup' | 'booking' | 'cancel' | 'access_link', id } or { type: 'reminders' }
+// Body: { type: 'mentor_signup' | 'mentor_photo' | 'booking' | 'cancel' | 'access_link', id } or { type: 'reminders' }
 // Secrets: GMAIL_USER, GMAIL_APP_PASSWORD, SITE_URL (optional), NOTIFY_SECRET (optional, see below)
 // Deploy with verify_jwt = false. It only ever emails addresses already in the database,
 // and each email is sent at most once (the *_sent_at columns).
@@ -89,7 +89,7 @@ function layout(heading: string, body: string) {
     <tr><td style="padding:28px 24px 8px"><h1 style="margin:0 0 12px;font-size:22px">${heading}</h1>${body}</td></tr>
     <tr><td style="padding:16px 24px 8px;font-size:14px;color:#111;border-top:1px solid #eee">
       <b>Derek O'Leary</b><br>
-      <span style="color:#555">Assistant Professor, Advertising and Robertson Virtual Mentorship Day lead<br>
+      <span style="color:#555">Assistant Professor, Advertising and <i>Robertson Virtual Mentorship Day</i> lead<br>
       Robertson School of Communication at VCU<br>
       <a href="mailto:robertsonvmd@gmail.com" style="color:#6b2b5b">robertsonvmd@gmail.com</a></span>
     </td></tr>
@@ -199,6 +199,44 @@ async function accessLink(id: string) {
   return 'sent'
 }
 
+// ---- Mentor photo: if a mentor didn't add one, try their LinkedIn photo, then Gravatar ----
+// LinkedIn doesn't offer photos to other sites, so we ask unavatar.io (a free lookup service).
+// It doesn't always work; then we try Gravatar by email, and otherwise the site shows their initial.
+async function sha256(text: string) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+async function tryImage(url: string): Promise<{ bytes: Uint8Array; type: string } | null> {
+  try {
+    const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000) })
+    const type = (r.headers.get('content-type') ?? '').split(';')[0]
+    if (!r.ok || !/^image\/(jpeg|png|webp|gif)$/.test(type)) return null
+    const bytes = new Uint8Array(await r.arrayBuffer())
+    return bytes.length > 500 && bytes.length < 2_000_000 ? { bytes, type } : null
+  } catch { return null }
+}
+async function mentorPhoto(id: string) {
+  const { data: m } = await db.from('mentors').select('id, email, linkedin_url, image_url, deleted_at').eq('id', id).maybeSingle()
+  if (!m || m.image_url || m.deleted_at) return 'skipped'
+  const handle = m.linkedin_url?.match(/linkedin\.com\/in\/([^/?#]+)/i)?.[1]
+  const sources = [
+    handle && `https://unavatar.io/linkedin/${encodeURIComponent(handle)}?fallback=false`,
+    `https://gravatar.com/avatar/${await sha256(m.email.trim().toLowerCase())}?d=404&s=400`,
+  ].filter(Boolean) as string[]
+  for (const src of sources) {
+    const img = await tryImage(src)
+    if (!img) continue
+    const ext = img.type.split('/')[1].replace('jpeg', 'jpg')
+    const path = `${m.id}.${ext}`
+    const up = await db.storage.from('headshots').upload(path, img.bytes, { contentType: img.type, upsert: true })
+    if (up.error) throw up.error
+    const url = db.storage.from('headshots').getPublicUrl(path).data.publicUrl + `?v=${Date.now()}`
+    await db.from('mentors').update({ image_url: url }).eq('id', m.id).is('image_url', null)
+    return `photo from ${src.includes('unavatar') ? 'LinkedIn' : 'Gravatar'}`
+  }
+  return 'no photo found'
+}
+
 async function reminders() {
   const { data } = await db.from('bookings').select('id, selected_time').is('cancelled_at', null).is('reminder_sent_at', null)
   const now = Date.now()
@@ -228,6 +266,7 @@ Deno.serve(async (req) => {
     const { type, id } = await req.json()
     const result =
       type === 'mentor_signup' ? await mentorSignup(id)
+      : type === 'mentor_photo' ? await mentorPhoto(id)
       : type === 'booking' ? await bookingConfirmed(id)
       : type === 'cancel' ? await bookingCancelled(id)
       : type === 'access_link' ? await accessLink(id)

@@ -78,6 +78,7 @@ export default function MentorRegistration() {
             </Field>
 
             <Button type="submit" className="w-full" disabled={saving}>{saving ? 'Submitting…' : 'Submit Registration'}</Button>
+            <p className="text-xs text-muted-foreground text-center">We'll email you a confirmation right away. Check your spam or junk folder if you don't see it.</p>
           </form>
         </CardContent>
       </Card>
