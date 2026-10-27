@@ -16,8 +16,8 @@ const SUBJECT = {
 /** Shown first on confirmation pages: go find the confirmation email now, it's probably in spam. */
 export function SpamHelp({ role, email }: { role: 'mentor' | 'student'; email: string }) {
   const upcoming = role === 'student'
-    ? 'your calendar invite, reminder, any cancellation notice, and sign-in links for your schedule'
-    : 'an email for every student who books you, reminders, cancellations, and sign-in links for your schedule'
+    ? 'your calendar invite, reminder, any cancellation notice, and links to your schedule'
+    : 'an email for every student who books you, reminders, cancellations, and links to your schedule'
   return (
     <section className="rounded-xl border-2 border-secondary bg-secondary/5 p-5 space-y-4" aria-labelledby="find-email">
       <div className="flex items-start gap-3">

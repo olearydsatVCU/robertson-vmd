@@ -65,7 +65,7 @@ export default function Home() {
               <CalendarCheck className="h-8 w-8 text-secondary shrink-0" />
               <div>
                 <h3 className="text-lg font-semibold">Check Mentor Schedule</h3>
-                <p className="text-sm text-muted-foreground">We'll email you a sign-in link to view bookings and manage time slots</p>
+                <p className="text-sm text-muted-foreground">We'll email you a link to view bookings and manage time slots</p>
               </div>
             </CardContent>
           </Card>
@@ -74,7 +74,7 @@ export default function Home() {
               <GraduationCap className="h-8 w-8 text-secondary shrink-0" />
               <div>
                 <h3 className="text-lg font-semibold">Check Student Schedule</h3>
-                <p className="text-sm text-muted-foreground">We'll email you a sign-in link to view or cancel your sessions</p>
+                <p className="text-sm text-muted-foreground">We'll email you a link to view or cancel your sessions</p>
               </div>
             </CardContent>
           </Card>

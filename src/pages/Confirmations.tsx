@@ -15,8 +15,8 @@ function Expired({ role }: { role: 'mentor' | 'student' }) {
       <Card className="max-w-md mx-auto">
         <CardHeader><CardTitle>Nothing to show here</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-muted-foreground">Your details were emailed to you. To see your schedule, request a sign-in link from the home page.</p>
-          <Button onClick={() => nav(`/${role}-schedule`)}>Get my sign-in link</Button>
+          <p className="text-muted-foreground">Your details were emailed to you. To see your schedule, request your schedule link from the home page.</p>
+          <Button onClick={() => nav(`/${role}-schedule`)}>Get my schedule link</Button>
         </CardContent>
       </Card>
     </Page>
@@ -40,7 +40,7 @@ export function MentorConfirmation() {
           <h3 className="font-semibold pt-2">Your details</h3>
           <div><div className="text-sm font-medium mb-1">Your available times</div><div className="flex flex-wrap gap-1">{sortTimes(m.available_times || []).map((t) => <Badge key={t}>{t}</Badge>)}</div></div>
           {m.meeting_url && <p className="text-sm"><span className="font-medium">Meeting link:</span> <a className="text-secondary hover:underline" href={m.meeting_url}>{m.meeting_url}</a></p>}
-          <p className="text-sm text-muted-foreground">Students will book into your open slots. You'll get an email for each booking. To view bookings or change your times, use the "Check Mentor Schedule" link on the home page and we'll email you a sign-in link.</p>
+          <p className="text-sm text-muted-foreground">Students will book into your open slots. You'll get an email for each booking. To view bookings or change your times, use the "Check Mentor Schedule" link on the home page and we'll email you a link.</p>
           <div className="flex gap-2 flex-wrap">
             <Button onClick={() => nav('/mentor-schedule')}>View My Schedule</Button>
             <Button variant="outline" onClick={() => nav('/')}>Return to Home</Button>

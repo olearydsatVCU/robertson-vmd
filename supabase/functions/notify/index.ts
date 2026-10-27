@@ -110,9 +110,24 @@ function sessionDetails(b: Booking, m: Mentor) {
   </table>`
 }
 
+// Plain-text copy of the designed email. Sending both versions makes spam filters trust it more.
+function toText(html: string) {
+  return html
+    .replace(/<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href, label) => {
+      const l = label.replace(/<[^>]+>/g, '').trim()
+      return l === href || href.startsWith('mailto:') ? l : `${l}: ${href}`
+    })
+    .replace(/<br[^>]*>\s*/gi, '\n')
+    .replace(/<(\/p|\/h1|\/tr|\/li)[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).join('\n')
+    .replace(/\n{3,}/g, '\n\n').trim()
+}
+
 async function send(to: string, subject: string, html: string, ics?: { method: 'REQUEST' | 'CANCEL'; content: string }) {
   await mailer.sendMail({
-    from: `"VCU Robertson VMD" <${GMAIL_USER}>`, to, subject, html,
+    from: `"VCU Robertson VMD" <${GMAIL_USER}>`, replyTo: GMAIL_USER, to, subject, html, text: toText(html),
     ...(ics ? { icalEvent: { method: ics.method, filename: 'invite.ics', content: ics.content } } : {}),
   })
 }
@@ -191,9 +206,10 @@ async function accessLink(id: string) {
   const path = t.role === 'admin' ? '/admin/' : `/${t.role}-schedule/`
   const link = `${SITE}${path}#k=${t.token}` // after "#": never sent to any server or link scanner
   const what = t.role === 'mentor' ? 'view your bookings and manage your time slots' : t.role === 'student' ? 'view or cancel your sessions' : 'open the admin dashboard'
-  await send(t.email, 'Your Virtual Mentorship Day sign-in link', layout('Your sign-in link', `
+  const subject = t.role === 'admin' ? 'Your Virtual Mentorship Day admin link' : 'Your Virtual Mentorship Day schedule link'
+  await send(t.email, subject, layout(t.role === 'admin' ? 'Your admin link' : 'Your schedule link', `
     <p>Click the button to ${what}. This link works for 12 hours and only for you, so please don't forward it.</p>
-    <p>${button(link, 'Sign in')}</p>
+    <p>${button(link, t.role === 'admin' ? 'Open the admin dashboard' : 'Open my schedule')}</p>
     <p style="font-size:13px;color:#666">If the button doesn't work, copy this address into your browser:<br><a href="${esc(link)}">${esc(link)}</a></p>
     <p style="font-size:13px;color:#666">Didn't request this? You can ignore this email.</p>`))
   return 'sent'
