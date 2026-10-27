@@ -25,14 +25,15 @@ export function getToken(role: Role): string | null {
 export function setToken(role: Role, token: string | null) {
   try { token ? sessionStorage.setItem(key(role), token) : sessionStorage.removeItem(key(role)) } catch { /* ignore */ }
 }
-/** Pick a ?token= from the URL (from a sign-in email), remember it, and clean the URL. */
+/** Pick up the sign-in key from an emailed link (#k=..., or older ?token=...), remember it, and clean the URL. */
 export function takeTokenFromUrl(role: Role): string | null {
   const url = new URL(window.location.href)
-  const t = url.searchParams.get('token')
+  const fromHash = new URLSearchParams(url.hash.replace(/^#/, '')).get('k')
+  const t = fromHash || url.searchParams.get('token')
   if (t) {
     setToken(role, t)
     url.searchParams.delete('token')
-    window.history.replaceState({}, '', url.pathname + url.search + url.hash)
+    window.history.replaceState({}, '', url.pathname + url.search)
     return t
   }
   return getToken(role)

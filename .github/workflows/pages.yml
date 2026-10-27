@@ -26,7 +26,12 @@ jobs:
       - run: npm run build
         env:
           GITHUB_PAGES: '1'
-      - run: cp dist/index.html dist/404.html
+      - name: One real page per route (avoids GitHub's 404 fallback for links in emails)
+        run: |
+          cp dist/index.html dist/404.html
+          for r in mentor-registration mentor-confirmation mentor-dashboard mentor-schedule student-booking student-confirmation student-dashboard student-schedule admin admin-bookings; do
+            mkdir -p "dist/$r" && cp dist/index.html "dist/$r/index.html"
+          done
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

@@ -16,7 +16,7 @@ function Expired({ role }: { role: 'mentor' | 'student' }) {
         <CardHeader><CardTitle>Nothing to show here</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <p className="text-muted-foreground">Your details were emailed to you. To see your schedule, request a sign-in link from the home page.</p>
-          <Button onClick={() => nav(`/?login=${role}`)}>Get my sign-in link</Button>
+          <Button onClick={() => nav(`/${role}-schedule`)}>Get my sign-in link</Button>
         </CardContent>
       </Card>
     </Page>
@@ -42,7 +42,7 @@ export function MentorConfirmation() {
           {m.meeting_url && <p className="text-sm"><span className="font-medium">Meeting link:</span> <a className="text-secondary hover:underline" href={m.meeting_url}>{m.meeting_url}</a></p>}
           <p className="text-sm text-muted-foreground">Students will book into your open slots. You'll get an email for each booking. To view bookings or change your times, use the "Check Mentor Schedule" link on the home page and we'll email you a sign-in link.</p>
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={() => nav('/?login=mentor')}>View My Schedule</Button>
+            <Button onClick={() => nav('/mentor-schedule')}>View My Schedule</Button>
             <Button variant="outline" onClick={() => nav('/')}>Return to Home</Button>
           </div>
         </CardContent>

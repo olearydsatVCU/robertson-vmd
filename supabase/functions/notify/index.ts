@@ -141,7 +141,7 @@ async function mentorSignup(id: string) {
       <p>You're registered as a mentor for VCU Robertson's Virtual Mentorship Day on <b>${EVENT_LABEL}</b>.</p>
       <p><b>Your open times (ET):</b> ${esc(slots)}</p>
       <p>Each time a student books you, you'll get an email with their details, the meeting link, and a calendar invite.</p>
-      <p>${button(`${SITE}/?login=mentor`, 'Manage my schedule')}</p>`))
+      <p>${button(`${SITE}/mentor-schedule/`, 'Manage my schedule')}</p>`))
     return 'sent'
   } catch (e) { await release('mentors', 'welcome_sent_at', id); throw e }
 }
@@ -157,12 +157,12 @@ async function bookingConfirmed(id: string) {
       <p>Hi ${esc(b.student_name)}, your 1-on-1 session is confirmed. This also confirms your sign-up for Virtual Mentorship Day.</p>
       ${sessionDetails(b, m)}
       <p>${button(b.meeting_url ?? SITE, 'Join meeting')} &nbsp; ${cal}</p>
-      <p style="font-size:14px;color:#666">Can't make it? <a href="${SITE}/?login=student">Cancel from your schedule</a> so another student can take the slot.</p>`), ics)
+      <p style="font-size:14px;color:#666">Can't make it? <a href="${SITE}/student-schedule/">Cancel from your schedule</a> so another student can take the slot.</p>`), ics)
     await send(m.email, `New booking: ${b.student_name} at ${b.selected_time} ET`, layout('A student booked a session with you', `
       <p>Hi ${esc(m.name)}, ${esc(b.student_name)} booked time with you.</p>
       ${sessionDetails(b, m)}
       <p>${button(b.meeting_url ?? SITE, 'Join meeting')} &nbsp; ${cal}</p>
-      <p style="font-size:14px;color:#666"><a href="${SITE}/?login=mentor">View or manage your schedule</a></p>`), ics)
+      <p style="font-size:14px;color:#666"><a href="${SITE}/mentor-schedule/">View or manage your schedule</a></p>`), ics)
     return 'sent'
   } catch (e) { await release('bookings', 'confirmation_sent_at', id); throw e }
 }
@@ -179,7 +179,7 @@ async function bookingCancelled(id: string) {
       <p>${button(`${SITE}/student-booking`, 'Book another mentor')}</p>`), ics)
     await send(m.email, `Cancelled: ${b.student_name} at ${b.selected_time} ET`, layout('A session was cancelled', `
       <p>Hi ${esc(m.name)}, this session was cancelled by ${esc(who)}.</p>${sessionDetails(b, m)}
-      <p style="font-size:14px;color:#666"><a href="${SITE}/?login=mentor">View your schedule</a></p>`), ics)
+      <p style="font-size:14px;color:#666"><a href="${SITE}/mentor-schedule/">View your schedule</a></p>`), ics)
     return 'sent'
   } catch (e) { await release('bookings', 'cancellation_sent_at', id); throw e }
 }
@@ -188,8 +188,8 @@ async function accessLink(id: string) {
   const { data: t } = await db.from('access_tokens').select('*').eq('token', id).maybeSingle()
   if (!t || t.sent_at) return 'skipped'
   await db.from('access_tokens').update({ sent_at: new Date().toISOString() }).eq('token', id)
-  const path = t.role === 'admin' ? '/admin' : `/${t.role}-dashboard`
-  const link = `${SITE}${path}?token=${t.token}`
+  const path = t.role === 'admin' ? '/admin/' : `/${t.role}-schedule/`
+  const link = `${SITE}${path}#k=${t.token}` // after "#": never sent to any server or link scanner
   const what = t.role === 'mentor' ? 'view your bookings and manage your time slots' : t.role === 'student' ? 'view or cancel your sessions' : 'open the admin dashboard'
   await send(t.email, 'Your Virtual Mentorship Day sign-in link', layout('Your sign-in link', `
     <p>Click the button to ${what}. This link works for 12 hours and only for you, so please don't forward it.</p>
