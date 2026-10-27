@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useState, type ReactNode, type 
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, X } from 'lucide-react'
 import { EVENT } from '../lib/config'
+import { fixUrl } from '../lib/url'
 import headerImg from '../assets/mentorship-header.png'
 
 export function cn(...c: (string | false | null | undefined)[]) {
@@ -24,6 +25,11 @@ export function Button({ variant = 'primary', className, ...p }: ButtonHTMLAttri
 
 export function Input({ className, ...p }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn('flex h-10 w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', className)} {...p} />
+}
+/** Text box for web links. Accepts links without https:// and adds it when the person leaves the field. */
+export function UrlInput({ value, onChange, ...p }: Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value' | 'type'> & { value: string; onChange: (v: string) => void }) {
+  return <Input {...p} type="text" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} value={value}
+    onChange={(e) => onChange(e.target.value)} onBlur={(e) => onChange(fixUrl(e.target.value))} />
 }
 export function Textarea({ className, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea className={cn('flex min-h-[90px] w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', className)} {...p} />

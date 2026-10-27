@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trash2, Pencil, Download } from 'lucide-react'
-import { Page, Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Field, Modal, Table, Th, Td, Badge, CheckboxGroup, useToast } from '../components/ui'
+import { Page, Card, CardHeader, CardTitle, CardContent, Button, Input, UrlInput, Select, Field, Modal, Table, Th, Td, Badge, CheckboxGroup, useToast } from '../components/ui'
 import { SignInPage } from '../components/SignIn'
 import { TRACKS, OPEN_TO, TOPICS, TIME_SLOTS, sortTimes } from '../lib/config'
 import { adminGetAll, adminCancelBooking, adminDeleteMentor, adminUpdateMentor, adminMatch, adminDeleteStudent, adminSetAdmins, takeTokenFromUrl, setToken } from '../lib/api'
@@ -204,8 +204,8 @@ export default function Admin() {
             <Field label="Email"><Input type="email" value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} /></Field>
             <Field label="Occupation"><Input value={editing.occupation || ''} onChange={(e) => setEditing({ ...editing, occupation: e.target.value })} /></Field>
             <Field label="Organization"><Input value={editing.organization || ''} onChange={(e) => setEditing({ ...editing, organization: e.target.value })} /></Field>
-            <Field label="LinkedIn URL"><Input value={editing.linkedin_url || ''} onChange={(e) => setEditing({ ...editing, linkedin_url: e.target.value })} /></Field>
-            <Field label="Meeting URL"><Input value={editing.meeting_url || ''} onChange={(e) => setEditing({ ...editing, meeting_url: e.target.value })} /></Field>
+            <Field label="LinkedIn URL"><UrlInput value={editing.linkedin_url || ''} onChange={(v) => setEditing({ ...editing, linkedin_url: v })} /></Field>
+            <Field label="Meeting URL"><UrlInput value={editing.meeting_url || ''} onChange={(v) => setEditing({ ...editing, meeting_url: v })} /></Field>
             <Field label="Tracks"><CheckboxGroup options={TRACKS} value={editing.tracks} onChange={(v) => setEditing({ ...editing, tracks: v })} /></Field>
             <Field label="Open to"><CheckboxGroup options={OPEN_TO} value={editing.open_to} onChange={(v) => setEditing({ ...editing, open_to: v })} /></Field>
             <Field label="Topics"><CheckboxGroup options={TOPICS} value={editing.topics} onChange={(v) => setEditing({ ...editing, topics: v })} /></Field>

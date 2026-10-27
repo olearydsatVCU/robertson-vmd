@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Page, BackButton, Card, CardHeader, CardTitle, CardContent, Field, Input, Button, CheckboxGroup, ClosedNotice, useToast } from '../components/ui'
+import { Page, BackButton, Card, CardHeader, CardTitle, CardContent, Field, Input, UrlInput, Button, CheckboxGroup, ClosedNotice, useToast } from '../components/ui'
 import { EVENT, TRACKS, OPEN_TO, TOPICS, TIME_SLOTS } from '../lib/config'
 import { registerMentor } from '../lib/api'
 
@@ -54,9 +54,9 @@ export default function MentorRegistration() {
               <Field label="Email *"><Input required type="email" placeholder="your@email.com" value={f.email} onChange={(e) => set('email', e.target.value)} /></Field>
               <Field label="Occupation / Title"><Input value={f.occupation} onChange={(e) => set('occupation', e.target.value)} /></Field>
               <Field label="Organization"><Input value={f.organization} onChange={(e) => set('organization', e.target.value)} /></Field>
-              <Field label="LinkedIn URL"><Input type="url" placeholder="https://linkedin.com/in/…" value={f.linkedIn} onChange={(e) => set('linkedIn', e.target.value)} /></Field>
-              <Field label="Meeting Link (Zoom / Google Meet)" hint="Students will use this link to join your session."><Input type="url" placeholder="https://zoom.us/j/…" value={f.meetingUrl} onChange={(e) => set('meetingUrl', e.target.value)} /></Field>
-              <Field label="Headshot image URL (optional)"><Input type="url" value={f.imageUrl} onChange={(e) => set('imageUrl', e.target.value)} /></Field>
+              <Field label="LinkedIn URL"><UrlInput placeholder="linkedin.com/in/yourname" value={f.linkedIn} onChange={(v) => set('linkedIn', v)} /></Field>
+              <Field label="Meeting Link (Zoom / Google Meet)" hint="Students will use this link to join your session."><UrlInput placeholder="zoom.us/j/123456789" value={f.meetingUrl} onChange={(v) => set('meetingUrl', v)} /></Field>
+              <Field label="Headshot image URL (optional)"><UrlInput placeholder="Link to a photo of you" value={f.imageUrl} onChange={(v) => set('imageUrl', v)} /></Field>
             </div>
 
             <Field label="Tracks"><CheckboxGroup options={TRACKS} value={f.tracks} onChange={(v) => set('tracks', v)} /></Field>

@@ -3,6 +3,7 @@ import { CheckCircle2 } from 'lucide-react'
 import { Page, Card, CardHeader, CardTitle, CardContent, Button, Badge } from '../components/ui'
 import { EVENT, sortTimes } from '../lib/config'
 import type { PublicMentor } from '../lib/api'
+import { SpamHelp } from '../components/SpamHelp'
 import type { Booking, Mentor } from '../lib/types'
 
 // These pages show what was just submitted (passed from the form). If someone
@@ -37,6 +38,7 @@ export function MentorConfirmation() {
         <CardContent className="space-y-4">
           <div><div className="text-sm font-medium mb-1">Your available times</div><div className="flex flex-wrap gap-1">{sortTimes(m.available_times || []).map((t) => <Badge key={t}>{t}</Badge>)}</div></div>
           {m.meeting_url && <p className="text-sm"><span className="font-medium">Meeting link:</span> <a className="text-secondary hover:underline" href={m.meeting_url}>{m.meeting_url}</a></p>}
+          <SpamHelp role="mentor" />
           <p className="text-sm text-muted-foreground">Students will book into your open slots. You'll get an email for each booking. To view bookings or change your times, use the "Check Mentor Schedule" link on the home page and we'll email you a sign-in link.</p>
           <div className="flex gap-2 flex-wrap">
             <Button onClick={() => nav('/?login=mentor')}>View My Schedule</Button>
@@ -69,6 +71,7 @@ export function StudentConfirmation() {
             {b.discussion_topics?.length > 0 && <><dt className="text-muted-foreground">Discussion Topics</dt><dd>{b.discussion_topics.join(', ')}</dd></>}
             {b.specific_topics && <><dt className="text-muted-foreground">Specific Topics</dt><dd>{b.specific_topics}</dd></>}
           </dl>
+          <SpamHelp role="student" />
           <div className="flex gap-2 flex-wrap">
             <Button variant="secondary" onClick={() => nav('/student-booking')}>Book Another Mentor</Button>
             <Button variant="outline" onClick={() => nav('/')}>Return to Home</Button>

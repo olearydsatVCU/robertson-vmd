@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
-import { Page, BackButton, Card, CardHeader, CardTitle, CardContent, Field, Input, Textarea, Select, Button, Badge, ClosedNotice, useToast } from '../components/ui'
+import { Page, BackButton, Card, CardHeader, CardTitle, CardContent, Field, Input, UrlInput, Textarea, Select, Button, Badge, ClosedNotice, useToast } from '../components/ui'
 import { EVENT, CLASS_LEVELS, OPEN_TO, sortTimes } from '../lib/config'
 import { listMentors, bookSession, type PublicMentor } from '../lib/api'
 
@@ -138,7 +138,7 @@ export default function StudentBooking() {
                     ))}
                   </div>
                 </Field>
-                <Field label="Portfolio / LinkedIn URL"><Input type="url" value={f.portfolioUrl} onChange={(e) => set('portfolioUrl', e.target.value)} /></Field>
+                <Field label="Portfolio / LinkedIn URL"><UrlInput placeholder="linkedin.com/in/yourname" value={f.portfolioUrl} onChange={(v) => set('portfolioUrl', v)} /></Field>
                 <Field label="Anything specific you'd like to cover?"><Textarea value={f.specificTopics} onChange={(e) => set('specificTopics', e.target.value)} /></Field>
                 <Button type="submit" variant="secondary" className="w-full" disabled={saving}>{saving ? 'Booking…' : 'Book Session'}</Button>
               </form>

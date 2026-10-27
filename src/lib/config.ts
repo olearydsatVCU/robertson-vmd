@@ -7,6 +7,9 @@ export const EVENT = {
   time: 'All Day (Eastern Time)',
   // Also update EVENT_DATE in supabase/functions/notify/index.ts when this changes.
   dateISO: '2026-11-13',
+  // Name (and optional address) our emails come from. Shown in the spam-folder help.
+  senderName: 'VCU Robertson VMD',
+  senderEmail: '', // e.g. 'robertsonvmd@gmail.com'
   contacts: [
     { name: 'Jay Adams', title: 'Associate Professor at Robertson', email: 'jwadams@vcu.edu' },
     { name: "Derek O'Leary", title: 'Assistant Professor at Robertson', email: 'olearyds@vcu.edu' },

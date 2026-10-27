@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Page, Card, CardHeader, CardTitle, CardContent, Button, Badge, Input, Modal, Table, Th, Td, useToast } from '../components/ui'
+import { Page, Card, CardHeader, CardTitle, CardContent, Button, Badge, UrlInput, Modal, Table, Th, Td, useToast } from '../components/ui'
 import { SignInPage } from '../components/SignIn'
 import { EVENT, TIME_SLOTS, sortTimes } from '../lib/config'
 import { getMentorSchedule, mentorUpdate, mentorCancel, takeTokenFromUrl, setToken } from '../lib/api'
@@ -67,7 +67,7 @@ export default function MentorDashboard() {
           <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
             <p><span className="text-muted-foreground">Event:</span> {EVENT.dateLong} (Eastern Time)</p>
             <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); run(() => mentorUpdate(token, { meeting_url: meeting }), 'Meeting link saved') }}>
-              <Input placeholder="Your Zoom / Google Meet link" value={meeting} onChange={(e) => setMeeting(e.target.value)} />
+              <UrlInput placeholder="Your Zoom / Google Meet link" value={meeting} onChange={setMeeting} />
               <Button type="submit" variant="outline" disabled={busy || meeting === (mentor.meeting_url || '')}>Save</Button>
             </form>
             <p className="sm:col-span-2 text-xs text-muted-foreground">Leave the meeting link blank and each booking gets its own free video link automatically. Links in confirmation emails already sent won't change.</p>
