@@ -2,20 +2,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trash2, Pencil, Download } from 'lucide-react'
 import { Page, Card, CardHeader, CardTitle, CardContent, Button, Input, UrlInput, Select, Field, Modal, Table, Th, Td, Badge, CheckboxGroup, useToast } from '../components/ui'
-import { SignInPage } from '../components/SignIn'
+import { AdminLogin } from '../components/AdminLogin'
 import { TRACKS, OPEN_TO, TOPICS, TIME_SLOTS, sortTimes } from '../lib/config'
-import { adminGetAll, adminCancelBooking, adminDeleteMentor, adminUpdateMentor, adminMatch, adminDeleteStudent, adminSetAdmins, takeTokenFromUrl, setToken } from '../lib/api'
+import { adminGetAll, adminCancelBooking, adminDeleteMentor, adminUpdateMentor, adminMatch, adminDeleteStudent, getToken, setToken } from '../lib/api'
 import type { Booking, Mentor, StudentRequest } from '../lib/types'
 
-type Tab = 'bookings' | 'mentors' | 'students' | 'matching' | 'admins'
+type Tab = 'bookings' | 'mentors' | 'students' | 'matching'
 
 export default function Admin() {
   const nav = useNavigate()
   const { toast } = useToast()
-  const [token, setTok] = useState<string | null>(() => takeTokenFromUrl('admin'))
+  const [token, setTok] = useState<string | null>(() => getToken('admin'))
   const [authError, setAuthError] = useState<string | undefined>()
-  const [admins, setAdmins] = useState<string[]>([])
-  const [adminsText, setAdminsText] = useState('')
   const [tab, setTab] = useState<Tab>('bookings')
   const [bookings, setBookings] = useState<Booking[]>([])
   const [mentors, setMentors] = useState<Mentor[]>([])
@@ -28,9 +26,9 @@ export default function Admin() {
     if (!token) return
     try {
       const d = await adminGetAll(token)
-      setBookings(d.bookings); setMentors(d.mentors); setRequests(d.requests); setAdmins(d.admins || [])
+      setBookings(d.bookings); setMentors(d.mentors); setRequests(d.requests)
     } catch (err) {
-      setToken('admin', null); setTok(null); setAuthError((err as Error).message)
+      setToken('admin', null); setTok(null); setAuthError('Your admin session ended. Please sign in again.')
     }
   }
   useEffect(() => { if (!token) return; load(); const i = setInterval(load, 10000); return () => clearInterval(i) }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -42,7 +40,7 @@ export default function Admin() {
     for (const b of bookings) { const s = map.get(b.student_email) || { name: b.student_name, email: b.student_email, bookings: [] }; s.bookings.push(b); map.set(b.student_email, s) }
     return [...map.values()].filter((s) => !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q))
   }, [bookings, search])
-  if (!token) return <SignInPage role="admin" reason={authError} />
+  if (!token) return <AdminLogin reason={authError} onLogin={(t) => { setToken('admin', t); setAuthError(undefined); setTok(t) }} />
   const fail = (title: string) => (err: unknown) => toast({ title, description: (err as Error).message, variant: 'destructive' })
 
   const mentorById = new Map(mentors.map((m) => [m.id, m]))
@@ -108,13 +106,13 @@ export default function Admin() {
         ))}
       </div>
       <div className="inline-flex h-10 items-center rounded-md bg-muted p-1 mb-4">
-        {(['bookings', 'mentors', 'students', 'matching', 'admins'] as Tab[]).map((t) => (
+        {(['bookings', 'mentors', 'students', 'matching'] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`rounded-sm px-3 py-1.5 text-sm font-medium capitalize ${tab === t ? 'bg-white shadow-sm' : 'text-muted-foreground'}`}>
             {t === 'matching' ? `Student Matching${unmatched.length ? ` (${unmatched.length})` : ''}` : t}
           </button>
         ))}
       </div>
-      {tab !== 'matching' && tab !== 'admins' && <Input placeholder={`Search ${tab} by name or email...`} className="max-w-sm mb-4" value={search} onChange={(e) => setSearch(e.target.value)} />}
+      {tab !== 'matching' && <Input placeholder={`Search ${tab} by name or email...`} className="max-w-sm mb-4" value={search} onChange={(e) => setSearch(e.target.value)} />}
 
       {tab === 'bookings' && (
         <Card><CardHeader><CardTitle>Booking Management</CardTitle></CardHeader><CardContent>
@@ -184,16 +182,6 @@ export default function Admin() {
                 <Button onClick={() => matchStudent(r)}>Confirm Booking</Button>
               </div>) })}</div>
           )}
-        </CardContent></Card>
-      )}
-
-      {tab === 'admins' && (
-        <Card><CardHeader><CardTitle>Admins</CardTitle><p className="text-sm text-muted-foreground">People who can sign in to this page. One email per line. You can't remove yourself.</p></CardHeader><CardContent>
-          <form className="space-y-3 max-w-md" onSubmit={async (e) => { e.preventDefault(); try { await adminSetAdmins(token, adminsText.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean)); toast({ title: 'Admins saved' }); setAdminsText(''); load() } catch (err) { fail('Failed to save admins')(err) } }}>
-            <p className="text-sm">Current: {admins.join(', ')}</p>
-            <textarea className="w-full min-h-[100px] rounded-md border border-border bg-white px-3 py-2 text-sm" placeholder={admins.join('\n')} value={adminsText} onChange={(e) => setAdminsText(e.target.value)} />
-            <Button type="submit" disabled={!adminsText.trim()}>Save admin list</Button>
-          </form>
         </CardContent></Card>
       )}
 

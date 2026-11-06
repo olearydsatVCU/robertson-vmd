@@ -55,11 +55,12 @@ export const getStudentSchedule = (token: string) => rpc<{ email: string; bookin
 export const studentCancel = (token: string, bookingId: string) => rpc<void>('student_cancel', { p_token: token, p_booking_id: bookingId })
 
 /* ---- admin ---- */
-export type AdminData = { mentors: Mentor[]; bookings: Booking[]; requests: StudentRequest[]; admins: string[] }
+export type AdminData = { mentors: Mentor[]; bookings: Booking[]; requests: StudentRequest[] }
 export const adminGetAll = (token: string) => rpc<AdminData>('admin_get_all', { p_token: token })
 export const adminCancelBooking = (token: string, bookingId: string) => rpc<void>('admin_cancel_booking', { p_token: token, p_booking_id: bookingId })
 export const adminDeleteMentor = (token: string, mentorId: string) => rpc<void>('admin_delete_mentor', { p_token: token, p_mentor_id: mentorId })
 export const adminUpdateMentor = (token: string, mentorId: string, p: Record<string, unknown>) => rpc<void>('admin_update_mentor', { p_token: token, p_mentor_id: mentorId, p })
 export const adminMatch = (token: string, requestId: string, mentorId: string, time: string) => rpc<void>('admin_match', { p_token: token, p_request_id: requestId, p_mentor_id: mentorId, p_time: time })
 export const adminDeleteStudent = (token: string, email: string) => rpc<void>('admin_delete_student', { p_token: token, p_email: email })
-export const adminSetAdmins = (token: string, emails: string[]) => rpc<void>('admin_set_admins', { p_token: token, p_emails: emails })
+/** Returns a 12-hour admin key, or null if the username or password is wrong. */
+export const adminLogin = (username: string, password: string) => rpc<string | null>('admin_login', { p_username: username, p_password: password })
