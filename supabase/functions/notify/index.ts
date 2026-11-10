@@ -1,6 +1,6 @@
 // Supabase Edge Function: all Virtual Mentorship Day emails.
 // Called by the database (triggers + a 10-minute reminder job), never by the browser.
-// Body: { type: 'mentor_signup' | 'mentor_photo' | 'booking' | 'cancel' | 'access_link', id } or { type: 'reminders' }
+// Body: { type: 'mentor_signup' | 'mentor_photo' | 'booking' | 'reschedule' | 'cancel' | 'access_link', id } or { type: 'reminders' }
 // Secrets: GMAIL_USER, GMAIL_APP_PASSWORD, SITE_URL (optional), NOTIFY_SECRET (optional, see below)
 // Deploy with verify_jwt = false. It only ever emails addresses already in the database,
 // and each email is sent at most once (the *_sent_at columns).
@@ -29,6 +29,7 @@ type Booking = {
   id: string; mentor_id: string; student_name: string; student_email: string; graduation_date: string | null
   discussion_topics: string[]; portfolio_url: string | null; specific_topics: string | null; selected_time: string
   meeting_url: string | null; cancelled_at: string | null; cancelled_by: string | null; created_at: string
+  invite_sequence?: number; previous_time?: string | null
 }
 
 // ---- Helpers ----
@@ -50,7 +51,7 @@ function invite(b: Booking, m: Mentor, method: 'REQUEST' | 'CANCEL') {
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//VCU Robertson//VMD//EN', `METHOD:${method}`,
     'BEGIN:VEVENT',
     `UID:${b.id}@robertson-vmd`,
-    `SEQUENCE:${method === 'CANCEL' ? 1 : 0}`,
+    `SEQUENCE:${(b.invite_sequence ?? 0) + (method === 'CANCEL' ? 1 : 0)}`,
     `DTSTAMP:${icsStamp(new Date())}`,
     `DTSTART:${icsStamp(startOf(b.selected_time))}`,
     `DTEND:${icsStamp(endOf(b.selected_time))}`,
@@ -182,6 +183,30 @@ async function bookingConfirmed(id: string) {
   } catch (e) { await release('bookings', 'confirmation_sent_at', id); throw e }
 }
 
+async function bookingRescheduled(id: string) {
+  const r = await loadBooking(id)
+  if (!r || r.b.cancelled_at || !(await claim('bookings', 'reschedule_sent_at', id))) return 'skipped'
+  const { b, m } = r
+  try {
+    // Same calendar event (same UID) with a higher SEQUENCE, so calendars move it instead of adding a second one.
+    const ics = { method: 'REQUEST' as const, content: invite(b, m, 'REQUEST') }
+    const cal = button(googleCalLink(b, m), 'Add new time to Google Calendar', true)
+    const changed = `<p style="font-size:16px;background:#FFF4D6;border-left:4px solid #FFB300;padding:12px 14px;margin:0 0 8px">
+      New time: <b>${esc(b.selected_time)} ET</b>${b.previous_time ? ` <span style="color:#666">(was ${esc(b.previous_time)} ET)</span>` : ''}</p>`
+    await send(b.student_email, `Time changed: your session with ${m.name} is now ${b.selected_time} ET`, layout('Your session time has changed', `
+      <p>Hi ${esc(b.student_name)}, the event organizers moved your mentorship session with ${esc(m.name)} to a new time. Everything else stays the same.</p>
+      ${changed}${sessionDetails(b, m)}
+      <p>${button(b.meeting_url ?? SITE, 'Join meeting')} &nbsp; ${cal}</p>
+      <p style="font-size:14px;color:#666">The attached calendar invite updates the event you already have. If your calendar shows two, delete the one at ${esc(b.previous_time ?? 'the old time')}. Can't make the new time? <a href="${SITE}/student-schedule/">Manage your schedule</a> or reply to this email.</p>`), ics)
+    await send(m.email, `Time changed: ${b.student_name} is now at ${b.selected_time} ET`, layout('A session time has changed', `
+      <p>Hi ${esc(m.name)}, the event organizers moved your session with ${esc(b.student_name)} to a new time.${b.previous_time ? ` Your ${esc(b.previous_time)} ET slot is open again for other students.` : ''}</p>
+      ${changed}${sessionDetails(b, m)}
+      <p>${button(b.meeting_url ?? SITE, 'Join meeting')} &nbsp; ${cal}</p>
+      <p style="font-size:14px;color:#666">The attached calendar invite updates the event you already have. <a href="${SITE}/mentor-schedule/">View your schedule</a></p>`), ics)
+    return 'sent'
+  } catch (e) { await release('bookings', 'reschedule_sent_at', id); throw e }
+}
+
 async function bookingCancelled(id: string) {
   const r = await loadBooking(id)
   if (!r || !r.b.cancelled_at || !(await claim('bookings', 'cancellation_sent_at', id))) return 'skipped'
@@ -284,6 +309,7 @@ Deno.serve(async (req) => {
       type === 'mentor_signup' ? await mentorSignup(id)
       : type === 'mentor_photo' ? await mentorPhoto(id)
       : type === 'booking' ? await bookingConfirmed(id)
+      : type === 'reschedule' ? await bookingRescheduled(id)
       : type === 'cancel' ? await bookingCancelled(id)
       : type === 'access_link' ? await accessLink(id)
       : type === 'reminders' ? await reminders()

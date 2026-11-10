@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Trash2, Pencil, Download } from 'lucide-react'
+import { Trash2, Pencil, Download, Clock } from 'lucide-react'
 import { Page, Card, CardHeader, CardTitle, CardContent, Button, Input, UrlInput, Select, Field, Modal, Table, Th, Td, Badge, CheckboxGroup, useToast } from '../components/ui'
 import { AdminLogin } from '../components/AdminLogin'
 import { TRACKS, OPEN_TO, TOPICS, TIME_SLOTS, sortTimes } from '../lib/config'
-import { adminGetAll, adminCancelBooking, adminDeleteMentor, adminUpdateMentor, adminMatch, adminDeleteStudent, getToken, setToken } from '../lib/api'
+import { adminGetAll, adminCancelBooking, adminRescheduleBooking, adminDeleteMentor, adminUpdateMentor, adminMatch, adminDeleteStudent, getToken, setToken } from '../lib/api'
 import type { Booking, Mentor, StudentRequest } from '../lib/types'
 
 type Tab = 'bookings' | 'mentors' | 'students' | 'matching'
@@ -20,6 +20,7 @@ export default function Admin() {
   const [requests, setRequests] = useState<StudentRequest[]>([])
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Mentor | null>(null)
+  const [moving, setMoving] = useState<{ booking: Booking; time: string } | null>(null)
   const [match, setMatch] = useState<Record<string, { mentorId?: string; time?: string }>>({})
 
   const load = async () => {
@@ -47,6 +48,13 @@ export default function Admin() {
   const q = search.toLowerCase()
 
   /* ---- actions ---- */
+  const moveBooking = async () => {
+    if (!moving?.time) return
+    try { await adminRescheduleBooking(token, moving.booking.id, moving.time) } catch (err) { return fail('Could not change the time')(err) }
+    toast({ title: 'Time changed', description: `Moved to ${moving.time}. Both people were emailed an updated calendar invite.` })
+    setMoving(null); load()
+  }
+
   const deleteBooking = async (b: Booking) => {
     if (!confirm(`Delete ${b.student_name}'s booking with ${mentorById.get(b.mentor_id)?.name} at ${b.selected_time}? The slot will reopen and both people get a cancellation email.`)) return
     try { await adminCancelBooking(token, b.id) } catch (err) { return fail('Failed to cancel booking')(err) }
@@ -126,7 +134,10 @@ export default function Admin() {
                   <Td>{m?.name || 'Unknown'}<div className="text-xs text-muted-foreground">{m?.email}</div></Td>
                   <Td className="max-w-xs">{[...(b.discussion_topics || []), b.specific_topics].filter(Boolean).join('; ') || '—'}</Td>
                   <Td className="whitespace-nowrap text-muted-foreground">{new Date(b.created_at).toLocaleString()}</Td>
-                  <Td><Button variant="ghost" onClick={() => deleteBooking(b)} aria-label="Delete booking"><Trash2 className="h-4 w-4 text-destructive" /></Button></Td>
+                  <Td className="whitespace-nowrap">
+                    <Button variant="ghost" onClick={() => setMoving({ booking: b, time: '' })} aria-label="Change booking time" title="Change time"><Clock className="h-4 w-4" /></Button>
+                    <Button variant="ghost" onClick={() => deleteBooking(b)} aria-label="Delete booking" title="Cancel booking"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </Td>
                 </tr>) })}</tbody>
             </Table>
           )}
@@ -184,6 +195,27 @@ export default function Admin() {
           )}
         </CardContent></Card>
       )}
+
+      <Modal open={!!moving} onClose={() => setMoving(null)} title="Change session time"
+        description={moving ? `${moving.booking.student_name} with ${mentorById.get(moving.booking.mentor_id)?.name ?? 'mentor'}, now at ${moving.booking.selected_time} ET` : undefined}>
+        {moving && (() => {
+          const mentorBookings = new Set(bookings.filter((x) => x.mentor_id === moving.booking.mentor_id && x.id !== moving.booking.id).map((x) => x.selected_time))
+          const open = new Set(mentorById.get(moving.booking.mentor_id)?.available_times || [])
+          const choices = TIME_SLOTS.filter((t) => t !== moving.booking.selected_time && !mentorBookings.has(t))
+          return (
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); moveBooking() }}>
+              <Field label="New time (Eastern Time)" hint="Times marked * aren't on the mentor's open list. Check with the mentor first.">
+                <Select value={moving.time} onChange={(e) => setMoving({ ...moving, time: e.target.value })} required>
+                  <option value="">Choose a time</option>
+                  {choices.map((t) => <option key={t} value={t}>{t}{open.has(t) ? '' : ' *'}</option>)}
+                </Select>
+              </Field>
+              <p className="text-sm text-muted-foreground">The old time ({moving.booking.selected_time}) goes back on the mentor's open list. The student and mentor both get a "time changed" email with an updated calendar invite.</p>
+              <div className="flex gap-2"><Button type="submit" disabled={!moving.time}>Change time and email both</Button><Button type="button" variant="ghost" onClick={() => setMoving(null)}>Cancel</Button></div>
+            </form>
+          )
+        })()}
+      </Modal>
 
       <Modal open={!!editing} onClose={() => setEditing(null)} title="Edit Mentor">
         {editing && (
