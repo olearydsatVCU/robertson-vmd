@@ -36,11 +36,19 @@ const textTable = (rows: string[][]) => rows.map((r) => '  • ' + r.filter(Bool
 const link = (url?: string | null, label?: string) => (url ? `<a href="${esc(url)}">${esc(label ?? url)}</a>` : '')
 const p = (s: string) => `<p style="font-family:Arial,sans-serif;font-size:14px;margin:0 0 12px">${s}</p>`
 
+// Mentors without their own Zoom/Meet link get a free video link per session: show it in the table.
+const mentorHeaders = (m: Mentor) => ['Time (ET)', 'Student', 'Email', 'Class', 'Topics', ...(m.meeting_url ? [] : ['Meeting Link'])]
+const mentorTextRows = (m: Mentor, booked: Booking[]) => booked.map((b) => [
+  b.selected_time, b.student_name, b.student_email, b.graduation_date || '',
+  [...(b.discussion_topics || []), b.specific_topics].filter(Boolean).join('; '), ...(m.meeting_url ? [] : [b.meeting_url ?? '']),
+])
+
 function mentorDraft(m: Mentor, booked: Booking[], deadline: string, eventDay: string): Draft {
   const open = sortTimes((m.available_times || []).filter((t) => !booked.some((b) => b.selected_time === t)))
   const rows = booked.map((b) => [
     esc(b.selected_time), `<b>${esc(b.student_name)}</b>`, link(`mailto:${b.student_email}`, b.student_email),
     esc(b.graduation_date || ''), esc([...(b.discussion_topics || []), b.specific_topics].filter(Boolean).join('; ')),
+    ...(m.meeting_url ? [] : [link(b.meeting_url) || 'Check your booking email']),
   ])
   if (booked.length && !open.length) return mentorFinalDraft(m, booked, rows, eventDay)
   const intro = booked.length
@@ -48,12 +56,12 @@ function mentorDraft(m: Mentor, booked: Booking[], deadline: string, eventDay: s
     : `Thank you for volunteering for Virtual Mentorship Day on <b>${esc(eventDay)}</b>! No students have booked with you yet, but there's still time.`
   const meeting = m.meeting_url
     ? `Your meeting link: ${link(m.meeting_url)}`
-    : `You didn't add a meeting link, so each session gets its own free video link. It's in each booking email you receive.`
+    : (booked.length ? `You didn't add a meeting link, so each session has its own free video link, shown in the table above.` : `You didn't add a meeting link, so each session will get its own free video link, included in each booking email.`)
   const html = [
     BANNER,
     p(`Hello ${esc(first(m.name))}!`),
     p(intro),
-    booked.length ? `${p('<b>Students who have booked with you so far:</b>')}${table(['Time (ET)', 'Student', 'Email', 'Class', 'Topics'], rows)}` : '',
+    booked.length ? `${p('<b>Students who have booked with you so far:</b>')}${table(mentorHeaders(m), rows)}` : '',
     p(`<b>Your remaining open times (ET):</b> ${open.length ? esc(open.join(', ')) : 'none. Your schedule is full!'}`),
     p(meeting),
     p(`Student sign-ups close <b>${esc(deadline)}</b>. Your final schedule will go out after that.`),
@@ -63,7 +71,7 @@ function mentorDraft(m: Mentor, booked: Booking[], deadline: string, eventDay: s
   const text = [
     `Hello ${first(m.name)}!`, '',
     intro.replace(/<[^>]+>/g, ''), '',
-    ...(booked.length ? ['Students who have booked with you so far:', textTable(booked.map((b) => [b.selected_time, b.student_name, b.student_email, b.graduation_date || '', [...(b.discussion_topics || []), b.specific_topics].filter(Boolean).join('; ')])), ''] : []),
+    ...(booked.length ? ['Students who have booked with you so far:', textTable(mentorTextRows(m, booked)), ''] : []),
     `Your remaining open times (ET): ${open.length ? open.join(', ') : 'none. Your schedule is full!'}`, '',
     m.meeting_url ? `Your meeting link: ${m.meeting_url}` : meeting, '',
     `Student sign-ups close ${deadline}. Your final schedule will go out after that.`, '',
@@ -81,7 +89,7 @@ function mentorDraft(m: Mentor, booked: Booking[], deadline: string, eventDay: s
 function mentorFinalDraft(m: Mentor, booked: Booking[], rows: string[][], eventDay: string): Draft {
   const meeting = m.meeting_url
     ? `Your meeting link for all sessions: ${link(m.meeting_url)}`
-    : `Each session has its own free video link, listed in the booking email you received for that student.`
+    : `Each session has its own free video link, shown in the Meeting Link column above.`
   const notes = [
     'Students have been asked to come prepared with their portfolio, resume, or specific questions.',
     "If a student can't make it, they've been asked to email you and cancel, so you may get a cancellation email.",
@@ -91,7 +99,7 @@ function mentorFinalDraft(m: Mentor, booked: Booking[], rows: string[][], eventD
     BANNER,
     p(`Hello ${esc(first(m.name))}!`),
     p(`Great news: your schedule for Virtual Mentorship Day on <b>${esc(eventDay)}</b> is full. Here is your <b>final schedule</b>:`),
-    table(['Time (ET)', 'Student', 'Email', 'Class', 'Topics'], rows),
+    table(mentorHeaders(m), rows),
     p(meeting),
     p('Please save these details and test your meeting link a few minutes before your first session.'),
     p('<b>A few quick notes:</b>'),
@@ -102,7 +110,7 @@ function mentorFinalDraft(m: Mentor, booked: Booking[], rows: string[][], eventD
   const text = [
     `Hello ${first(m.name)}!`, '',
     `Great news: your schedule for Virtual Mentorship Day on ${eventDay} is full. Here is your final schedule:`,
-    textTable(booked.map((b) => [b.selected_time, b.student_name, b.student_email, b.graduation_date || '', [...(b.discussion_topics || []), b.specific_topics].filter(Boolean).join('; ')])), '',
+    textTable(mentorTextRows(m, booked)), '',
     m.meeting_url ? `Your meeting link for all sessions: ${m.meeting_url}` : meeting, '',
     'Please save these details and test your meeting link a few minutes before your first session.', '',
     'A few quick notes:', ...notes.map((n) => `  • ${n}`), '',
