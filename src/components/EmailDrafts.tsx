@@ -13,6 +13,7 @@ import bannerImg from '../assets/mentorship-header.png'
 
 const SITE = `${window.location.origin}${import.meta.env.BASE_URL}`.replace(/\/$/, '')
 const SENT_KEY = 'vmd-email-drafts-sent'
+const SNAP_KEY = 'vmd-email-drafts-snapshot' // booking ids each email covered when it was sent
 const FINAL_KEY = 'vmd-final-schedule-sent'
 const BANNER = `<img src="${new URL(bannerImg, window.location.href).href}" alt="Virtual Mentorship Day 11.13.26" width="600" style="max-width:100%;height:auto;display:block;margin:0 0 12px">`
 
@@ -22,7 +23,7 @@ const roleOrg = (m?: Mentor) => [m?.occupation, m?.organization].filter(Boolean)
 
 const byTime = (list: Booking[]) => sortTimes(list.map((b) => b.selected_time)).map((t) => list.find((b) => b.selected_time === t)!)
 
-type Draft = { key: string; to: string; name: string; subject: string; html: string; text: string; summary: string; final?: boolean }
+type Draft = { key: string; to: string; name: string; subject: string; html: string; text: string; summary: string; final?: boolean; bookings: Booking[] }
 
 // Simple inline-styled table that survives pasting into Gmail / Outlook.
 function table(headers: string[], rows: string[][]) {
@@ -79,7 +80,7 @@ function mentorDraft(m: Mentor, booked: Booking[], deadline: string, eventDay: s
     'Thanks, and let me know if you have any questions,', 'Derek',
   ].join('\n')
   return {
-    key: `m:${m.email}`, to: m.email, name: m.name,
+    key: `m:${m.email}`, to: m.email, name: m.name, bookings: booked,
     subject: `VCU Robertson School's Virtual Mentorship Day | Your Schedule So Far`,
     html, text, summary: `${booked.length} booked · ${open.length} open`,
   }
@@ -118,7 +119,7 @@ function mentorFinalDraft(m: Mentor, booked: Booking[], rows: string[][], eventD
     'Thanks, and let me know if you have any questions,', 'Derek',
   ].join('\n')
   return {
-    key: `m:${m.email}`, to: m.email, name: m.name, final: true,
+    key: `m:${m.email}`, to: m.email, name: m.name, final: true, bookings: booked,
     subject: `VCU Robertson School's Virtual Mentorship Day | Your Final Schedule`,
     html, text, summary: `${booked.length} booked · full`,
   }
@@ -148,7 +149,7 @@ function studentDraft(name: string, email: string, booked: Booking[], mentorById
     'Thanks, and let me know if you have any questions,', 'Derek',
   ].join('\n')
   return {
-    key: `s:${email}`, to: email, name,
+    key: `s:${email}`, to: email, name, bookings: booked,
     subject: `VCU Robertson School's Virtual Mentorship Day | Your Schedule So Far`,
     html, text, summary: `${booked.length} session${booked.length === 1 ? '' : 's'}`,
   }
@@ -166,6 +167,8 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
   const [sent, setSent] = useState<Record<string, string>>(() => loadMap(SENT_KEY))
   const [finalSent, setFinalSent] = useState<Record<string, string>>(() => loadMap(FINAL_KEY))
   const [openKey, setOpenKey] = useState<string | null>(null)
+  const [snaps, setSnaps] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem(SNAP_KEY) || '{}') } catch { return {} } })
+  const [onlyChanged, setOnlyChanged] = useState(false)
 
   const drafts = useMemo(() => {
     const mentorById = new Map(mentors.map((m) => [m.id, m]))
@@ -188,7 +191,23 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
     set(next)
     try { localStorage.setItem(storeKey, JSON.stringify(next)) } catch { /* ignore */ }
   }
-  const markSent = (key: string, on: boolean) => toggle(sent, setSent, SENT_KEY, key, on)
+  const markSent = (key: string, on: boolean) => {
+    toggle(sent, setSent, SENT_KEY, key, on)
+    const next = { ...snaps }
+    if (on) next[key] = (drafts.find((d) => d.key === key)?.bookings || []).map((b) => b.id); else delete next[key]
+    setSnaps(next)
+    try { localStorage.setItem(SNAP_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+  }
+  /** What changed since this email was marked sent: new bookings and cancellations. */
+  const changesFor = (d: Draft) => {
+    const at = sent[d.key]
+    if (!at) return null
+    const snap = snaps[d.key]
+    const added = d.bookings.filter((b) => (snap ? !snap.includes(b.id) : new Date(b.created_at) > new Date(at)))
+    const removed = snap ? snap.filter((id) => !d.bookings.some((b) => b.id === id)).length : 0
+    return added.length || removed ? { added, removed } : null
+  }
+  const mentorName = (id: string) => mentors.find((m) => m.id === id)?.name ?? 'a mentor'
   // Ticking "Final schedule sent" also ticks "Sent".
   const markFinal = (key: string, on: boolean) => { toggle(finalSent, setFinalSent, FINAL_KEY, key, on); if (on && !sent[key]) markSent(key, true) }
 
@@ -206,6 +225,8 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
   }
   const copy = async (value: string, what: string) => { await navigator.clipboard.writeText(value); toast({ title: `Copied ${what}` }) }
   const doneCount = drafts.filter((d) => sent[d.key]).length
+  const changedCount = drafts.filter((d) => changesFor(d)).length
+  const shown = onlyChanged ? drafts.filter((d) => changesFor(d)) : drafts
   const finalCount = drafts.filter((d) => finalSent[d.key]).length
   const fullCount = drafts.filter((d) => d.final).length
 
@@ -231,13 +252,20 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
         </div>
         <p className="text-sm">
           <b>{doneCount} of {drafts.length}</b> marked sent
+          {changedCount > 0 && <> · <b className="text-secondary">{changedCount} changed since you emailed them</b></>}
           {who === 'mentors' && <> · <b>{finalCount}</b> received their final schedule{fullCount > 0 && <> · {fullCount} fully booked {fullCount === 1 ? 'mentor gets' : 'mentors get'} their final schedule in this round</>}</>}
         </p>
 
+        {changedCount > 0 && (
+          <label className="inline-flex items-center gap-2 text-sm font-medium cursor-pointer">
+            <input type="checkbox" checked={onlyChanged} onChange={(e) => setOnlyChanged(e.target.checked)} /> Only show people whose schedule changed after I emailed them
+          </label>
+        )}
         {drafts.length === 0 && <p className="text-muted-foreground">No {who} yet.</p>}
         <div className="space-y-3">
-          {drafts.map((d) => {
+          {shown.map((d) => {
             const isSent = !!sent[d.key]
+            const ch = changesFor(d)
             const isOpen = openKey === d.key
             return (
               <div key={d.key} className={`rounded-xl border p-4 ${isSent ? 'border-border bg-muted/50' : 'border-border bg-white'}`}>
@@ -245,6 +273,21 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
                   <div className="min-w-0">
                     <p className="font-semibold">{d.name} {d.final && <Badge tone="primary">Full: final schedule</Badge>} {finalSent[d.key] ? <Badge tone="secondary">Final schedule sent</Badge> : isSent && <Badge tone="secondary">Sent</Badge>}</p>
                     <p className="text-sm text-muted-foreground break-all">{d.to} · {d.summary}</p>
+                    {ch && (
+                      <div className="mt-2 rounded-lg border border-primary bg-primary/15 px-3 py-2 text-sm">
+                        <p className="font-semibold">
+                          {ch.added.length > 0 && <>{who === 'students' ? 'Booked' : 'Got'} {ch.added.length} new session{ch.added.length === 1 ? '' : 's'} after your email</>}
+                          {ch.added.length > 0 && ch.removed > 0 && ' · '}
+                          {ch.removed > 0 && <>{ch.removed} cancelled after your email</>}
+                        </p>
+                        {ch.added.length > 0 && (
+                          <p className="text-muted-foreground">
+                            New: {ch.added.map((b) => `${b.selected_time} with ${who === 'students' ? mentorName(b.mentor_id) : b.student_name}`).join(', ')}
+                          </p>
+                        )}
+                        <p className="text-muted-foreground">The draft below is up to date. Send it again if you want them to have the latest schedule, then click "Sent again."</p>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" className="h-9" onClick={() => copy(d.to, 'email address')}><Copy className="h-4 w-4" /> Address</Button>
@@ -255,9 +298,13 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
                       <Mail className="h-4 w-4" /> New email
                     </a>
                     <Button variant="ghost" className="h-9" onClick={() => setOpenKey(isOpen ? null : d.key)}>{isOpen ? 'Hide preview' : 'Preview'}</Button>
-                    <label className="inline-flex items-center gap-2 text-sm font-medium px-2 cursor-pointer">
-                      <input type="checkbox" checked={isSent} onChange={(e) => markSent(d.key, e.target.checked)} /> {isSent ? <><Check className="h-4 w-4" /> Sent</> : 'Sent'}
-                    </label>
+                    {ch ? (
+                      <Button variant="outline" className="h-9" onClick={() => markSent(d.key, true)}><Check className="h-4 w-4" /> Sent again</Button>
+                    ) : (
+                      <label className="inline-flex items-center gap-2 text-sm font-medium px-2 cursor-pointer">
+                        <input type="checkbox" checked={isSent} onChange={(e) => markSent(d.key, e.target.checked)} /> {isSent ? <><Check className="h-4 w-4" /> Sent</> : 'Sent'}
+                      </label>
+                    )}
                     {who === 'mentors' && (
                       <label className="inline-flex items-center gap-2 text-sm font-medium px-2 cursor-pointer">
                         <input type="checkbox" checked={!!finalSent[d.key]} onChange={(e) => markFinal(d.key, e.target.checked)} /> Final schedule sent
