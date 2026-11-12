@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { Trash2, Pencil, Download } from 'lucide-react'
 import { Page, Card, CardHeader, CardTitle, CardContent, Button, Input, UrlInput, Select, Field, Modal, Table, Th, Td, Badge, CheckboxGroup, useToast } from '../components/ui'
 import { AdminLogin } from '../components/AdminLogin'
+import { EmailDrafts } from '../components/EmailDrafts'
 import { TRACKS, OPEN_TO, TOPICS, TIME_SLOTS, sortTimes } from '../lib/config'
 import { adminGetAll, adminCancelBooking, adminDeleteMentor, adminUpdateMentor, adminMatch, adminDeleteStudent, getToken, setToken } from '../lib/api'
 import type { Booking, Mentor, StudentRequest } from '../lib/types'
 
-type Tab = 'bookings' | 'mentors' | 'students' | 'matching'
+type Tab = 'bookings' | 'mentors' | 'students' | 'matching' | 'emails'
 
 export default function Admin() {
   const nav = useNavigate()
@@ -106,13 +107,13 @@ export default function Admin() {
         ))}
       </div>
       <div className="inline-flex h-10 items-center rounded-md bg-muted p-1 mb-4">
-        {(['bookings', 'mentors', 'students', 'matching'] as Tab[]).map((t) => (
+        {(['bookings', 'mentors', 'students', 'matching', 'emails'] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`rounded-sm px-3 py-1.5 text-sm font-medium capitalize ${tab === t ? 'bg-white shadow-sm' : 'text-muted-foreground'}`}>
-            {t === 'matching' ? `Student Matching${unmatched.length ? ` (${unmatched.length})` : ''}` : t}
+            {t === 'matching' ? `Student Matching${unmatched.length ? ` (${unmatched.length})` : ''}` : t === 'emails' ? 'Email drafts' : t}
           </button>
         ))}
       </div>
-      {tab !== 'matching' && <Input placeholder={`Search ${tab} by name or email...`} className="max-w-sm mb-4" value={search} onChange={(e) => setSearch(e.target.value)} />}
+      {tab !== 'matching' && tab !== 'emails' && <Input placeholder={`Search ${tab} by name or email...`} className="max-w-sm mb-4" value={search} onChange={(e) => setSearch(e.target.value)} />}
 
       {tab === 'bookings' && (
         <Card><CardHeader><CardTitle>Booking Management</CardTitle></CardHeader><CardContent>
@@ -170,6 +171,8 @@ export default function Admin() {
           )}
         </CardContent></Card>
       )}
+
+      {tab === 'emails' && <EmailDrafts mentors={mentors} bookings={bookings} />}
 
       {tab === 'matching' && (
         <Card><CardHeader><CardTitle>Student Matching</CardTitle><p className="text-sm text-muted-foreground">Students on the waitlist who haven't been matched with a mentor yet.</p></CardHeader><CardContent>
