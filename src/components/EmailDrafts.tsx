@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Copy, Mail, Check } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Field, Input, Badge, useToast } from './ui'
-import { sortTimes } from '../lib/config'
+import { EVENT, sortTimes } from '../lib/config'
 import type { Booking, Mentor } from '../lib/types'
 import bannerImg from '../assets/mentorship-header.png'
 
@@ -15,6 +15,14 @@ const SITE = `${window.location.origin}${import.meta.env.BASE_URL}`.replace(/\/$
 const SENT_KEY = 'vmd-email-drafts-sent'
 const SNAP_KEY = 'vmd-email-drafts-snapshot' // booking ids each email covered when it was sent
 const FINAL_KEY = 'vmd-final-schedule-sent'
+// The final round (after sign-ups close) gets its own fresh "sent" tracking.
+const ROUND_SENT = EVENT.studentBookingOpen ? SENT_KEY : 'vmd-final-round-sent'
+const ROUND_SNAP = EVENT.studentBookingOpen ? SNAP_KEY : 'vmd-final-round-snapshot'
+// Once sign-ups close, every email is the final schedule.
+const CLOSED = !EVENT.studentBookingOpen
+const CONTACT = 'If you have any issues with your meetings tomorrow, reply to this email or contact me at <a href="mailto:robertsonvmd@gmail.com">robertsonvmd@gmail.com</a>.'
+const CONTACT_TEXT = 'If you have any issues with your meetings tomorrow, reply to this email or contact me at robertsonvmd@gmail.com.'
+const ul = (items: string[]) => `<ul style="font-family:Arial,sans-serif;font-size:14px;margin:0 0 12px;padding-left:20px;list-style-type:disc">${items.map((n) => `<li style="margin:0 0 6px">${n}</li>`).join('')}</ul>`
 const BANNER = `<img src="${new URL(bannerImg, window.location.href).href}" alt="Virtual Mentorship Day 11.13.26" width="600" style="max-width:100%;height:auto;display:block;margin:0 0 12px">`
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
@@ -51,7 +59,8 @@ function mentorDraft(m: Mentor, booked: Booking[], deadline: string, eventDay: s
     esc(b.graduation_date || ''), esc([...(b.discussion_topics || []), b.specific_topics].filter(Boolean).join('; ')),
     ...(m.meeting_url ? [] : [link(b.meeting_url) || 'Check your booking email']),
   ])
-  if (booked.length && !open.length) return mentorFinalDraft(m, booked, rows, eventDay)
+  if (booked.length && (CLOSED || !open.length)) return mentorFinalDraft(m, booked, rows, eventDay, open.length === 0)
+  if (CLOSED) return mentorNoBookingsDraft(m, eventDay)
   const intro = booked.length
     ? `Students have started booking time with you for Virtual Mentorship Day on <b>${esc(eventDay)}</b>. Thank you again for volunteering!`
     : `Thank you for volunteering for Virtual Mentorship Day on <b>${esc(eventDay)}</b>! No students have booked with you yet, but there's still time.`
@@ -86,46 +95,74 @@ function mentorDraft(m: Mentor, booked: Booking[], deadline: string, eventDay: s
   }
 }
 
-/** Mentor whose times are all booked: send the final schedule now instead of a "so far" update. */
-function mentorFinalDraft(m: Mentor, booked: Booking[], rows: string[][], eventDay: string): Draft {
+/** Sign-ups closed and nobody booked this mentor: a thank-you note. */
+function mentorNoBookingsDraft(m: Mentor, eventDay: string): Draft {
+  const html = [
+    BANNER,
+    p(`Hello ${esc(first(m.name))}!`),
+    p(`Sign-ups for Virtual Mentorship Day on <b>${esc(eventDay)}</b> are now closed, and unfortunately no students booked time with you this round. That means you have no meetings tomorrow.`),
+    p("Thank you so much for volunteering your time and supporting our students. We'd love to have you back for a future Virtual Mentorship Day."),
+    p(CONTACT),
+    p('Thanks again,<br>Derek'),
+  ].join('\n')
+  const text = [
+    `Hello ${first(m.name)}!`, '',
+    `Sign-ups for Virtual Mentorship Day on ${eventDay} are now closed, and unfortunately no students booked time with you this round. That means you have no meetings tomorrow.`, '',
+    "Thank you so much for volunteering your time and supporting our students. We'd love to have you back for a future Virtual Mentorship Day.", '',
+    CONTACT_TEXT, '', 'Thanks again,', 'Derek',
+  ].join('\n')
+  return {
+    key: `m:${m.email}`, to: m.email, name: m.name, final: true, bookings: [],
+    subject: `VCU Robertson School's Virtual Mentorship Day | Thank You`,
+    html, text, summary: 'no bookings',
+  }
+}
+
+/** The mentor's final schedule: sent once sign-ups close, or earlier if all their times are booked. */
+function mentorFinalDraft(m: Mentor, booked: Booking[], rows: string[][], eventDay: string, full: boolean): Draft {
   const meeting = m.meeting_url
     ? `Your meeting link for all sessions: ${link(m.meeting_url)}`
     : `Each session has its own free video link, shown in the Meeting Link column above.`
   const notes = [
     'Students have been asked to come prepared with their portfolio, resume, or specific questions.',
-    "If a student can't make it, they've been asked to email you and cancel, so you may get a cancellation email.",
-    'If something comes up on your end, please reply to this email or email the student directly so we can help them reschedule.',
+    "If a student can't make it, they've been asked to email you, so you may get a cancellation email.",
+    'If something comes up on your end, please email the student directly and let us know.',
   ]
   const html = [
     BANNER,
     p(`Hello ${esc(first(m.name))}!`),
-    p(`Great news: your schedule for Virtual Mentorship Day on <b>${esc(eventDay)}</b> is full. Here is your <b>final schedule</b>:`),
+    p(full
+      ? `Great news: your schedule for Virtual Mentorship Day on <b>${esc(eventDay)}</b> is full. <b>This is your final schedule</b>:`
+      : `Sign-ups for Virtual Mentorship Day on <b>${esc(eventDay)}</b> are now closed. <b>This is your final schedule</b>:`),
     table(mentorHeaders(m), rows),
     p(meeting),
     p('Please save these details and test your meeting link a few minutes before your first session.'),
     p('<b>A few quick notes:</b>'),
     `<ul style="font-family:Arial,sans-serif;font-size:14px;margin:0 0 12px;padding-left:20px;list-style-type:disc">${notes.map((n) => `<li style="margin:0 0 6px">${esc(n)}</li>`).join('')}</ul>`,
+    p(CONTACT),
     p('Thank you so much for volunteering your time. Our students really appreciate it!'),
-    p('Thanks, and let me know if you have any questions,<br>Derek'),
+    p('Thanks,<br>Derek'),
   ].join('\n')
   const text = [
     `Hello ${first(m.name)}!`, '',
-    `Great news: your schedule for Virtual Mentorship Day on ${eventDay} is full. Here is your final schedule:`,
+    full ? `Great news: your schedule for Virtual Mentorship Day on ${eventDay} is full. This is your final schedule:` : `Sign-ups for Virtual Mentorship Day on ${eventDay} are now closed. This is your final schedule:`,
     textTable(mentorTextRows(m, booked)), '',
     m.meeting_url ? `Your meeting link for all sessions: ${m.meeting_url}` : meeting, '',
     'Please save these details and test your meeting link a few minutes before your first session.', '',
     'A few quick notes:', ...notes.map((n) => `  • ${n}`), '',
+    CONTACT_TEXT, '',
     'Thank you so much for volunteering your time. Our students really appreciate it!', '',
-    'Thanks, and let me know if you have any questions,', 'Derek',
+    'Thanks,', 'Derek',
   ].join('\n')
   return {
     key: `m:${m.email}`, to: m.email, name: m.name, final: true, bookings: booked,
     subject: `VCU Robertson School's Virtual Mentorship Day | Your Final Schedule`,
-    html, text, summary: `${booked.length} booked · full`,
+    html, text, summary: `${booked.length} booked${full ? ' · full' : ''}`,
   }
 }
 
 function studentDraft(name: string, email: string, booked: Booking[], mentorById: Map<string, Mentor>, deadline: string, eventDay: string): Draft {
+  if (CLOSED) return studentFinalDraft(name, email, booked, mentorById, eventDay)
   const sorted = byTime(booked)
   const rows = sorted.map((b) => {
     const m = mentorById.get(b.mentor_id)
@@ -155,6 +192,50 @@ function studentDraft(name: string, email: string, booked: Booking[], mentorById
   }
 }
 
+/** Student's final schedule (sign-ups closed). */
+function studentFinalDraft(name: string, email: string, booked: Booking[], mentorById: Map<string, Mentor>, eventDay: string): Draft {
+  const sorted = byTime(booked)
+  const rows = sorted.map((b) => {
+    const m = mentorById.get(b.mentor_id)
+    return [esc(b.selected_time), `<b>${esc(m?.name ?? 'Mentor')}</b>`, esc(roleOrg(m)), b.meeting_url ? link(b.meeting_url) : 'Check your booking email']
+  })
+  const tips = [
+    '<b>Be prepared:</b> have your portfolio, resume, or specific questions ready.',
+    '<b>Be professional:</b> find a quiet spot, and have your camera on.',
+    '<b>Be on time:</b> test your meeting link a few minutes early. Sessions are 30 minutes.',
+    "<b>Can't make it?</b> Email your mentor right away as a courtesy, and cancel from your " + link(`${SITE}/student-schedule/`, 'schedule page') + '.',
+  ]
+  const tipsText = [
+    'Be prepared: have your portfolio, resume, or specific questions ready.',
+    'Be professional: find a quiet spot, and have your camera on.',
+    'Be on time: test your meeting link a few minutes early. Sessions are 30 minutes.',
+    `Can't make it? Email your mentor right away as a courtesy, and cancel from your schedule page: ${SITE}/student-schedule/`,
+  ]
+  const html = [
+    BANNER,
+    p(`Hello ${esc(first(name))}!`),
+    p(`Sign-ups for the Robertson School's Virtual Mentorship Day on <b>${esc(eventDay)}</b> are now closed. <b>This is your final schedule</b>:`),
+    table(['Time (ET)', 'Mentor', 'Role / Organization', 'Meeting Link'], rows),
+    p('<b>A few quick tips:</b>'),
+    ul(tips),
+    p(CONTACT),
+    p('Good luck tomorrow, and enjoy your conversations!<br>Derek'),
+  ].join('\n')
+  const text = [
+    `Hello ${first(name)}!`, '',
+    `Sign-ups for the Robertson School's Virtual Mentorship Day on ${eventDay} are now closed. This is your final schedule:`,
+    textTable(sorted.map((b) => { const m = mentorById.get(b.mentor_id); return [b.selected_time, m?.name ?? 'Mentor', roleOrg(m), b.meeting_url ?? 'Check your booking email'] })), '',
+    'A few quick tips:', ...tipsText.map((t) => `  • ${t}`), '',
+    CONTACT_TEXT, '',
+    'Good luck tomorrow, and enjoy your conversations!', 'Derek',
+  ].join('\n')
+  return {
+    key: `s:${email}`, to: email, name, bookings: booked, final: true,
+    subject: `VCU Robertson School's Virtual Mentorship Day | Your Final Schedule`,
+    html, text, summary: `${booked.length} session${booked.length === 1 ? '' : 's'}`,
+  }
+}
+
 function loadMap(key: string): Record<string, string> {
   try { return JSON.parse(localStorage.getItem(key) || '{}') } catch { return {} }
 }
@@ -164,10 +245,10 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
   const [who, setWho] = useState<'mentors' | 'students'>('mentors')
   const [deadline, setDeadline] = useState('Thursday, November 12 at 8 PM ET')
   const [eventDay, setEventDay] = useState('Friday, November 13')
-  const [sent, setSent] = useState<Record<string, string>>(() => loadMap(SENT_KEY))
+  const [sent, setSent] = useState<Record<string, string>>(() => loadMap(ROUND_SENT))
   const [finalSent, setFinalSent] = useState<Record<string, string>>(() => loadMap(FINAL_KEY))
   const [openKey, setOpenKey] = useState<string | null>(null)
-  const [snaps, setSnaps] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem(SNAP_KEY) || '{}') } catch { return {} } })
+  const [snaps, setSnaps] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem(ROUND_SNAP) || '{}') } catch { return {} } })
   const [onlyChanged, setOnlyChanged] = useState(false)
 
   const drafts = useMemo(() => {
@@ -192,11 +273,11 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
     try { localStorage.setItem(storeKey, JSON.stringify(next)) } catch { /* ignore */ }
   }
   const markSent = (key: string, on: boolean) => {
-    toggle(sent, setSent, SENT_KEY, key, on)
+    toggle(sent, setSent, ROUND_SENT, key, on)
     const next = { ...snaps }
     if (on) next[key] = (drafts.find((d) => d.key === key)?.bookings || []).map((b) => b.id); else delete next[key]
     setSnaps(next)
-    try { localStorage.setItem(SNAP_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+    try { localStorage.setItem(ROUND_SNAP, JSON.stringify(next)) } catch { /* ignore */ }
   }
   /** What changed since this email was marked sent: new bookings and cancellations. */
   const changesFor = (d: Draft) => {
@@ -235,7 +316,9 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
       <CardHeader>
         <CardTitle>Email drafts</CardTitle>
         <p className="text-sm text-muted-foreground">
-          One ready-to-send "schedule so far" email per person, built from the current bookings. For each one: copy the address, subject and email, paste them into a new email from your own account, send, then tick "Sent".
+          {CLOSED
+            ? 'Sign-ups are closed, so every email is the final schedule. For each person: copy the address, subject and email, paste them into a new email from your own account, send, then tick "Final schedule sent".'
+            : 'One ready-to-send "schedule so far" email per person, built from the current bookings. For each one: copy the address, subject and email, paste them into a new email from your own account, send, then tick "Sent".'}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -247,13 +330,14 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
           ))}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Sign-up deadline (shown in the emails)"><Input value={deadline} onChange={(e) => setDeadline(e.target.value)} /></Field>
+          {!CLOSED && <Field label="Sign-up deadline (shown in the emails)"><Input value={deadline} onChange={(e) => setDeadline(e.target.value)} /></Field>}
           <Field label="Event day (shown in the emails)"><Input value={eventDay} onChange={(e) => setEventDay(e.target.value)} /></Field>
         </div>
         <p className="text-sm">
           <b>{doneCount} of {drafts.length}</b> marked sent
           {changedCount > 0 && <> · <b className="text-secondary">{changedCount} changed since you emailed them</b></>}
-          {who === 'mentors' && <> · <b>{finalCount}</b> received their final schedule{fullCount > 0 && <> · {fullCount} fully booked {fullCount === 1 ? 'mentor gets' : 'mentors get'} their final schedule in this round</>}</>}
+          {who === 'mentors' && !CLOSED && <> · <b>{finalCount}</b> received their final schedule{fullCount > 0 && <> · {fullCount} fully booked {fullCount === 1 ? 'mentor gets' : 'mentors get'} their final schedule in this round</>}</>}
+          {who === 'mentors' && CLOSED && finalCount > 0 && <> · {finalCount} already got their final schedule in the earlier round (tagged below)</>}
         </p>
 
         {changedCount > 0 && (
@@ -271,7 +355,7 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
               <div key={d.key} className={`rounded-xl border p-4 ${isSent ? 'border-border bg-muted/50' : 'border-border bg-white'}`}>
                 <div className="flex flex-wrap items-center gap-3 justify-between">
                   <div className="min-w-0">
-                    <p className="font-semibold">{d.name} {d.final && <Badge tone="primary">Full: final schedule</Badge>} {finalSent[d.key] ? <Badge tone="secondary">Final schedule sent</Badge> : isSent && <Badge tone="secondary">Sent</Badge>}</p>
+                    <p className="font-semibold">{d.name} {!CLOSED && d.final && <Badge tone="primary">Full: final schedule</Badge>} {CLOSED && finalSent[d.key] && <Badge tone="primary">Got final schedule earlier</Badge>} {isSent ? <Badge tone="secondary">{CLOSED ? 'Final schedule sent' : 'Sent'}</Badge> : !CLOSED && finalSent[d.key] && <Badge tone="secondary">Final schedule sent</Badge>}</p>
                     <p className="text-sm text-muted-foreground break-all">{d.to} · {d.summary}</p>
                     {ch && (
                       <div className="mt-2 rounded-lg border border-primary bg-primary/15 px-3 py-2 text-sm">
@@ -302,10 +386,10 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
                       <Button variant="outline" className="h-9" onClick={() => markSent(d.key, true)}><Check className="h-4 w-4" /> Sent again</Button>
                     ) : (
                       <label className="inline-flex items-center gap-2 text-sm font-medium px-2 cursor-pointer">
-                        <input type="checkbox" checked={isSent} onChange={(e) => markSent(d.key, e.target.checked)} /> {isSent ? <><Check className="h-4 w-4" /> Sent</> : 'Sent'}
+                        <input type="checkbox" checked={isSent} onChange={(e) => markSent(d.key, e.target.checked)} /> {isSent ? <><Check className="h-4 w-4" /> {CLOSED ? 'Final schedule sent' : 'Sent'}</> : CLOSED ? 'Final schedule sent' : 'Sent'}
                       </label>
                     )}
-                    {who === 'mentors' && (
+                    {who === 'mentors' && !CLOSED && (
                       <label className="inline-flex items-center gap-2 text-sm font-medium px-2 cursor-pointer">
                         <input type="checkbox" checked={!!finalSent[d.key]} onChange={(e) => markFinal(d.key, e.target.checked)} /> Final schedule sent
                       </label>
