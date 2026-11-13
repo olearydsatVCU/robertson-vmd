@@ -14,8 +14,8 @@ export const EVENT = {
     { name: 'Jay Adams', title: 'Associate Professor at Robertson', email: 'jwadams@vcu.edu' },
     { name: "Derek O'Leary", title: 'Assistant Professor at Robertson', email: 'olearyds@vcu.edu' },
   ],
-  mentorRegistrationOpen: true,
-  studentBookingOpen: true,
+  mentorRegistrationOpen: false,
+  studentBookingOpen: false,
 }
 
 export const TRACKS = [
