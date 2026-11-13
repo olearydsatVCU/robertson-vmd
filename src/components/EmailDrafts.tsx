@@ -20,8 +20,8 @@ const ROUND_SENT = EVENT.studentBookingOpen ? SENT_KEY : 'vmd-final-round-sent'
 const ROUND_SNAP = EVENT.studentBookingOpen ? SNAP_KEY : 'vmd-final-round-snapshot'
 // Once sign-ups close, every email is the final schedule.
 const CLOSED = !EVENT.studentBookingOpen
-const CONTACT = 'If you have any issues with your meetings tomorrow, reply to this email or contact me at <a href="mailto:robertsonvmd@gmail.com">robertsonvmd@gmail.com</a>.'
-const CONTACT_TEXT = 'If you have any issues with your meetings tomorrow, reply to this email or contact me at robertsonvmd@gmail.com.'
+const CONTACT = 'If you have any issues with your meetings tomorrow, just reply to this email or reach out to me at <a href="mailto:olearyds@vcu.edu">olearyds@vcu.edu</a>.'
+const CONTACT_TEXT = 'If you have any issues with your meetings tomorrow, just reply to this email or reach out to me at olearyds@vcu.edu.'
 const ul = (items: string[]) => `<ul style="font-family:Arial,sans-serif;font-size:14px;margin:0 0 12px;padding-left:20px;list-style-type:disc">${items.map((n) => `<li style="margin:0 0 6px">${n}</li>`).join('')}</ul>`
 const BANNER = `<img src="${new URL(bannerImg, window.location.href).href}" alt="Virtual Mentorship Day 11.13.26" width="600" style="max-width:100%;height:auto;display:block;margin:0 0 12px">`
 
