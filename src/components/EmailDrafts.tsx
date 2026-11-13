@@ -22,6 +22,10 @@ const ROUND_SNAP = EVENT.studentBookingOpen ? SNAP_KEY : 'vmd-final-round-snapsh
 const CLOSED = !EVENT.studentBookingOpen
 const CONTACT = 'If you have any issues with your meetings tomorrow, just reply to this email or reach out to me at <a href="mailto:olearyds@vcu.edu">olearyds@vcu.edu</a>.'
 const CONTACT_TEXT = 'If you have any issues with your meetings tomorrow, just reply to this email or reach out to me at olearyds@vcu.edu.'
+// Free links are Jitsi Meet rooms: a meeting can't start until someone signs in as the moderator.
+const HOST_NOTE = '<b>Important: sign in to start your meetings.</b> The free video links use Jitsi Meet. When you open a link, click <b>"I am the host"</b> (or <b>"Log in"</b>) and sign in with a free Google, GitHub, or Facebook account. Until you sign in, there is no moderator, so the meeting won\'t start and your student will be stuck on a "waiting for the moderator" screen. Please open your first link a few minutes early to sign in.'
+const HOST_NOTE_TEXT = 'Important: sign in to start your meetings. The free video links use Jitsi Meet. When you open a link, click "I am the host" (or "Log in") and sign in with a free Google, GitHub, or Facebook account. Until you sign in, there is no moderator, so the meeting won\'t start and your student will be stuck on a "waiting for the moderator" screen. Please open your first link a few minutes early to sign in.'
+const hostBox = `<p style="font-family:Arial,sans-serif;font-size:14px;margin:0 0 12px;background:#FFF4D6;border-left:4px solid #FFB300;padding:10px 12px">${HOST_NOTE}</p>`
 const ul = (items: string[]) => `<ul style="font-family:Arial,sans-serif;font-size:14px;margin:0 0 12px;padding-left:20px;list-style-type:disc">${items.map((n) => `<li style="margin:0 0 6px">${n}</li>`).join('')}</ul>`
 const BANNER = `<img src="${new URL(bannerImg, window.location.href).href}" alt="Virtual Mentorship Day 11.13.26" width="600" style="max-width:100%;height:auto;display:block;margin:0 0 12px">`
 
@@ -74,6 +78,7 @@ function mentorDraft(m: Mentor, booked: Booking[], deadline: string, eventDay: s
     booked.length ? `${p('<b>Students who have booked with you so far:</b>')}${table(mentorHeaders(m), rows)}` : '',
     p(`<b>Your remaining open times (ET):</b> ${open.length ? esc(open.join(', ')) : 'none. Your schedule is full!'}`),
     p(meeting),
+    m.meeting_url ? '' : hostBox,
     p(`Student sign-ups close <b>${esc(deadline)}</b>. Your final schedule will go out after that.`),
     p(`Need to change your availability? Reply to this email, or update your times on your ${link(`${SITE}/mentor-schedule/`, 'mentor schedule page')}.`),
     p('Thanks, and let me know if you have any questions,<br>Derek'),
@@ -84,6 +89,7 @@ function mentorDraft(m: Mentor, booked: Booking[], deadline: string, eventDay: s
     ...(booked.length ? ['Students who have booked with you so far:', textTable(mentorTextRows(m, booked)), ''] : []),
     `Your remaining open times (ET): ${open.length ? open.join(', ') : 'none. Your schedule is full!'}`, '',
     m.meeting_url ? `Your meeting link: ${m.meeting_url}` : meeting, '',
+    ...(m.meeting_url ? [] : [HOST_NOTE_TEXT, '']),
     `Student sign-ups close ${deadline}. Your final schedule will go out after that.`, '',
     `Need to change your availability? Reply to this email, or update your times here: ${SITE}/mentor-schedule/`, '',
     'Thanks, and let me know if you have any questions,', 'Derek',
@@ -136,6 +142,7 @@ function mentorFinalDraft(m: Mentor, booked: Booking[], rows: string[][], eventD
       : `Sign-ups for Virtual Mentorship Day on <b>${esc(eventDay)}</b> are now closed. <b>This is your final schedule</b>:`),
     table(mentorHeaders(m), rows),
     p(meeting),
+    m.meeting_url ? '' : hostBox,
     p('Please save these details and test your meeting link a few minutes before your first session.'),
     p('<b>A few quick notes:</b>'),
     `<ul style="font-family:Arial,sans-serif;font-size:14px;margin:0 0 12px;padding-left:20px;list-style-type:disc">${notes.map((n) => `<li style="margin:0 0 6px">${esc(n)}</li>`).join('')}</ul>`,
@@ -148,6 +155,7 @@ function mentorFinalDraft(m: Mentor, booked: Booking[], rows: string[][], eventD
     full ? `Great news: your schedule for Virtual Mentorship Day on ${eventDay} is full. This is your final schedule:` : `Sign-ups for Virtual Mentorship Day on ${eventDay} are now closed. This is your final schedule:`,
     textTable(mentorTextRows(m, booked)), '',
     m.meeting_url ? `Your meeting link for all sessions: ${m.meeting_url}` : meeting, '',
+    ...(m.meeting_url ? [] : [HOST_NOTE_TEXT, '']),
     'Please save these details and test your meeting link a few minutes before your first session.', '',
     'A few quick notes:', ...notes.map((n) => `  • ${n}`), '',
     CONTACT_TEXT, '',
