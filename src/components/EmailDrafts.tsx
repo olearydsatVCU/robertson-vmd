@@ -250,6 +250,10 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
   const [openKey, setOpenKey] = useState<string | null>(null)
   const [snaps, setSnaps] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem(ROUND_SNAP) || '{}') } catch { return {} } })
   const [onlyChanged, setOnlyChanged] = useState(false)
+  // Earlier "schedule so far" round (kept in the browser), used once sign-ups close.
+  const [prevSent] = useState<Record<string, string>>(() => (CLOSED ? loadMap(SENT_KEY) : {}))
+  const [prevSnaps] = useState<Record<string, string[]>>(() => { if (!CLOSED) return {}; try { return JSON.parse(localStorage.getItem(SNAP_KEY) || '{}') } catch { return {} } })
+  const [needsOnly, setNeedsOnly] = useState(true)
 
   const drafts = useMemo(() => {
     const mentorById = new Map(mentors.map((m) => [m.id, m]))
@@ -280,6 +284,18 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
     try { localStorage.setItem(ROUND_SNAP, JSON.stringify(next)) } catch { /* ignore */ }
   }
   /** What changed since this email was marked sent: new bookings and cancellations. */
+  const diff = (d: Draft, at: string | undefined, snap: string[] | undefined) => {
+    if (!at) return null
+    const added = d.bookings.filter((b) => (snap ? !snap.includes(b.id) : new Date(b.created_at) > new Date(at)))
+    const removed = snap ? snap.filter((id) => !d.bookings.some((b) => b.id === id)).length : 0
+    return added.length || removed ? { added, removed } : null
+  }
+  /** Students in the final round: new (never emailed), changed since the earlier email, or unchanged (skip). */
+  const studentStatus = (d: Draft): 'new' | 'changed' | 'unchanged' | null => {
+    if (!CLOSED || who !== 'students') return null
+    if (!prevSent[d.key]) return 'new'
+    return diff(d, prevSent[d.key], prevSnaps[d.key]) ? 'changed' : 'unchanged'
+  }
   const changesFor = (d: Draft) => {
     const at = sent[d.key]
     if (!at) return null
@@ -307,7 +323,11 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
   const copy = async (value: string, what: string) => { await navigator.clipboard.writeText(value); toast({ title: `Copied ${what}` }) }
   const doneCount = drafts.filter((d) => sent[d.key]).length
   const changedCount = drafts.filter((d) => changesFor(d)).length
-  const shown = onlyChanged ? drafts.filter((d) => changesFor(d)) : drafts
+  const statusCounts = { new: 0, changed: 0, unchanged: 0 }
+  for (const d of drafts) { const st = studentStatus(d); if (st) statusCounts[st]++ }
+  const needsEmail = (d: Draft) => { const st = studentStatus(d); return (st === 'new' || st === 'changed') && !sent[d.key] || !!changesFor(d) }
+  const showStatus = CLOSED && who === 'students'
+  const shown = onlyChanged ? drafts.filter((d) => changesFor(d)) : showStatus && needsOnly ? drafts.filter(needsEmail) : drafts
   const finalCount = drafts.filter((d) => finalSent[d.key]).length
   const fullCount = drafts.filter((d) => d.final).length
 
@@ -340,6 +360,22 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
           {who === 'mentors' && CLOSED && finalCount > 0 && <> · {finalCount} already got their final schedule in the earlier round (tagged below)</>}
         </p>
 
+        {showStatus && (
+          <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm space-y-2">
+            <p>
+              Compared with the emails you sent before sign-ups closed:{' '}
+              <b>{statusCounts.new}</b> new {statusCounts.new === 1 ? 'student' : 'students'} (never emailed) ·{' '}
+              <b>{statusCounts.changed}</b> booked or cancelled sessions since your email ·{' '}
+              <b>{statusCounts.unchanged}</b> already emailed with no changes
+            </p>
+            <label className="inline-flex items-center gap-2 font-medium cursor-pointer">
+              <input type="checkbox" checked={needsOnly} onChange={(e) => setNeedsOnly(e.target.checked)} /> Only show students who still need an email (new or changed, not yet sent tonight)
+            </label>
+            {Object.keys(prevSent).length === 0 && (
+              <p className="text-destructive">No earlier "Sent" ticks found in this browser. Open this page in the browser you used before sign-ups closed.</p>
+            )}
+          </div>
+        )}
         {changedCount > 0 && (
           <label className="inline-flex items-center gap-2 text-sm font-medium cursor-pointer">
             <input type="checkbox" checked={onlyChanged} onChange={(e) => setOnlyChanged(e.target.checked)} /> Only show people whose schedule changed after I emailed them
@@ -347,16 +383,26 @@ export function EmailDrafts({ mentors, bookings }: { mentors: Mentor[]; bookings
         )}
         {drafts.length === 0 && <p className="text-muted-foreground">No {who} yet.</p>}
         <div className="space-y-3">
+          {showStatus && needsOnly && shown.length === 0 && drafts.length > 0 && <p className="text-muted-foreground">Everyone is up to date. No students need an email right now.</p>}
           {shown.map((d) => {
             const isSent = !!sent[d.key]
             const ch = changesFor(d)
+            const st = studentStatus(d)
+            const prevCh = st === 'changed' ? diff(d, prevSent[d.key], prevSnaps[d.key]) : null
             const isOpen = openKey === d.key
             return (
               <div key={d.key} className={`rounded-xl border p-4 ${isSent ? 'border-border bg-muted/50' : 'border-border bg-white'}`}>
                 <div className="flex flex-wrap items-center gap-3 justify-between">
                   <div className="min-w-0">
-                    <p className="font-semibold">{d.name} {!CLOSED && d.final && <Badge tone="primary">Full: final schedule</Badge>} {CLOSED && finalSent[d.key] && <Badge tone="primary">Got final schedule earlier</Badge>} {isSent ? <Badge tone="secondary">{CLOSED ? 'Final schedule sent' : 'Sent'}</Badge> : !CLOSED && finalSent[d.key] && <Badge tone="secondary">Final schedule sent</Badge>}</p>
+                    <p className="font-semibold">{d.name} {!CLOSED && d.final && <Badge tone="primary">Full: final schedule</Badge>} {CLOSED && finalSent[d.key] && <Badge tone="primary">Got final schedule earlier</Badge>} {st === 'new' && <Badge tone="primary">New: not emailed yet</Badge>} {st === 'changed' && <Badge tone="primary">Changed since your earlier email</Badge>} {st === 'unchanged' && <Badge>Emailed earlier · no changes</Badge>} {isSent ? <Badge tone="secondary">{CLOSED ? 'Final schedule sent' : 'Sent'}</Badge> : !CLOSED && finalSent[d.key] && <Badge tone="secondary">Final schedule sent</Badge>}</p>
                     <p className="text-sm text-muted-foreground break-all">{d.to} · {d.summary}</p>
+                    {prevCh && !isSent && (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Since your earlier email: {prevCh.added.length > 0 && <>added {prevCh.added.map((b) => `${b.selected_time} with ${mentorName(b.mentor_id)}`).join(', ')}</>}
+                        {prevCh.added.length > 0 && prevCh.removed > 0 && '; '}
+                        {prevCh.removed > 0 && <>{prevCh.removed} cancelled</>}
+                      </p>
+                    )}
                     {ch && (
                       <div className="mt-2 rounded-lg border border-primary bg-primary/15 px-3 py-2 text-sm">
                         <p className="font-semibold">
